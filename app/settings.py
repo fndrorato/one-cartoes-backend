@@ -19,7 +19,7 @@ SECRET_KEY = 'django-insecure-u)ib$@xq5f1+6!lc4)osy#8)3kg9x#+6_g6!vdhq3+11b@$@=2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['api-onecartoes.f5sys.com.br', 'localhost', '127.0.0.1']
 
 
 # Application definition
