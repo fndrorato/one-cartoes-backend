@@ -21,7 +21,6 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['api-onecartoes.f5sys.com.br', 'localhost', '127.0.0.1']
 
-
 # Application definition
 
 INSTALLED_APPS = [

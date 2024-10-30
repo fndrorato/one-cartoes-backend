@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 import requests
 import numpy as np
 import pandas as pd
@@ -141,8 +142,9 @@ class Command(BaseCommand):
         url = "https://api.conciliadora.com.br/api/ConsultaPagamento"
         group = Groups.objects.first()
         token = group.token
+        print(token)
 
-        params = {"$filter": "DataPagamento ge 2024-10-04"}
+        params = {"$filter": "DataPagamento ge 2024-09-01 and DataPagamento le 2024-09-30"}
         headers = {"Content-Type": "application/json", "Authorization": f"{token}"}
 
         response = requests.get(url, headers=headers, params=params)
@@ -246,85 +248,55 @@ class Command(BaseCommand):
             merged_df = pd.merge(merged_df, modalities_df[['code', 'modality_id']], left_on='IdModalidade', right_on='code', how='left')
             merged_df = pd.merge(merged_df, payment_status_df[['code', 'payment_status_id']], left_on='IdStatus', right_on='code', how='left')
             merged_df = pd.merge(merged_df, adquirentes_df[['adquirente_id']], left_on='AdqId', right_on='adquirente_id', how='left')
-                                    
-            
+                 
+            num_linhas = len(merged_df)
+            print("Número de linhas:", num_linhas)  
+
+            # Obtenha todas as instâncias relacionadas de uma vez e armazene em dicionários
+            clients = {client.id: client for client in Clients.objects.all()}
+            acquirers = {acquirer.id: acquirer for acquirer in Acquirer.objects.all()}
+            products = {product.id: product for product in Product.objects.all()}
+            banks = {bank.id: bank for bank in Bank.objects.all()}
+            transactions = {transaction.id: transaction for transaction in TransactionType.objects.all()}
+            payments = {payment.id: payment for payment in PaymentStatus.objects.all()}
+            modalities = {modality.id: modality for modality in Modality.objects.all()}
+
+            # Lista para armazenar objetos `Received`
+            recebidos = []
+
             for index, row in merged_df.iterrows():
                 try:
-                    # Tente buscar a instância do cliente com base no client_id
-                    client_instance = Clients.objects.get(id=row['client_id'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"Cliente com ID {row['client_id']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado
-                
-                try:
-                    # Tente buscar a instância do adquirente com base no id
-                    adquirente_instance = Acquirer.objects.get(id=row['adquirente_id'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"Adquirente com ID {row['adquirente_id']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado  
-                
-                try:
-                    # Tente buscar a instância do produto com base no id
-                    product_instance = Product.objects.get(id=row['product_id'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"Produto com ID {row['product_id']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado  
-                
-                try:
-                    # Tente buscar a instância do produto com base no id
-                    banco_instance = Bank.objects.get(id=row['banco'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"Bank com ID {row['banco']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado   
-                
-                try:
-                    # Tente buscar a instância do produto com base no id
-                    transaction_instance = TransactionType.objects.get(id=row['transaction_id'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"TransactionType com ID {row['transaction_id']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado                               
+                    # Use instâncias do dicionário em vez de fazer nova busca no banco
+                    client_instance = clients.get(row['client_id'])
+                    adquirente_instance = acquirers.get(row['adquirente_id'])
+                    product_instance = products.get(row['product_id'])
+                    banco_instance = banks.get(row['banco'])
+                    transaction_instance = transactions.get(row['transaction_id'])
+                    payment_instance = payments.get(row['payment_status_id'])
+                    modality_instance = modalities.get(row['modality_id'])
 
-                try:
-                    # Tente buscar a instância do produto com base no id
-                    payment_instance = PaymentStatus.objects.get(id=row['payment_status_id'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"PaymentStatus com ID {row['payment_status_id']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado 
-                
-                try:
-                    # Tente buscar a instância do produto com base no id
-                    modality_instance = Modality.objects.get(id=row['modality_id'])
-                except ObjectDoesNotExist:
-                    # Trate o caso onde o cliente não existe, se necessário
-                    print(f"Modality com ID {row['modality_id']} não encontrado.")
-                    continue  # Pula para o próximo loop se o cliente não for encontrado 
-                
-                # Verificação e conversão de valores
-                autorizacao = str(row['Autorizacao']) if not pd.isna(row['Autorizacao']) else ''
-                nsu = str(int(row['Nsu'])) if not pd.isna(row['Nsu']) else ''  # Convertendo de float para inteiro e depois para string
-                id_transacao = str(row['Tid']) if not pd.isna(row['Tid']) else ''
-                resumo_venda = str(row['ResumoVenda']) if not pd.isna(row['ResumoVenda']) else ''
-                outras_despesas = row['OutrasDespesas'] if not pd.isna(row['OutrasDespesas']) else 0
-                nome_loja = str(row['NomeLoja']) if not pd.isna(row['NomeLoja']) else ''
-                divergencias = str(row['Divergencias']) if not pd.isna(row['Divergencias']) else ''
-                observacao = str(row['Observacao']) if not pd.isna(row['Observacao']) else ''
-                motivo_ajuste = str(row['MotivoAjuste']) if not pd.isna(row['MotivoAjuste']) else ''
-                
-                # Convertendo as datas do DataFrame para o formato desejado
-                data_pagamento = datetime.strptime(str(row['DataPagamento']), '%Y-%m-%d') if pd.notna(row['DataPagamento']) else None
-                data_prevista_pagamento = datetime.strptime(str(row['DataPrevistaPagamento']), '%Y-%m-%d') if pd.notna(row['DataPrevistaPagamento']) else None
-                data_venda = datetime.strptime(str(row['DataVenda']), '%Y-%m-%d') if pd.notna(row['DataVenda']) else None        
-                                    
+                    if not all([client_instance, adquirente_instance, product_instance, banco_instance, transaction_instance, payment_instance, modality_instance]):
+                        print(f"Algum relacionamento não encontrado no índice {index}. Pulando...")
+                        continue  # Pule se algum relacionamento não foi encontrado
+
+                    # Preencha dados e ajuste para valores ausentes ou nulos
+                    autorizacao = str(row['Autorizacao']) if not pd.isna(row['Autorizacao']) else ''
+                    nsu = str(int(row['Nsu'])) if not pd.isna(row['Nsu']) else ''
+                    id_transacao = str(row['Tid']) if not pd.isna(row['Tid']) else ''
+                    resumo_venda = str(row['ResumoVenda']) if not pd.isna(row['ResumoVenda']) else ''
+                    outras_despesas = row['OutrasDespesas'] if not pd.isna(row['OutrasDespesas']) else 0
+                    nome_loja = str(row['NomeLoja']) if not pd.isna(row['NomeLoja']) else ''
+                    divergencias = str(row['Divergencias']) if not pd.isna(row['Divergencias']) else ''
+                    observacao = str(row['Observacao']) if not pd.isna(row['Observacao']) else ''
+                    motivo_ajuste = str(row['MotivoAjuste']) if not pd.isna(row['MotivoAjuste']) else ''
                     
-                try:
-                    # Salvando o pagamento
-                    pagamento = Received(
+                    # Conversão de datas
+                    data_pagamento = datetime.strptime(str(row['DataPagamento']), '%Y-%m-%d') if pd.notna(row['DataPagamento']) else None
+                    data_prevista_pagamento = datetime.strptime(str(row['DataPrevistaPagamento']), '%Y-%m-%d') if pd.notna(row['DataPrevistaPagamento']) else None
+                    data_venda = datetime.strptime(str(row['DataVenda']), '%Y-%m-%d') if pd.notna(row['DataVenda']) else None
+
+                    # Criação do objeto `Received` sem salvar ainda
+                    recebidos.append(Received(
                         id=row['Id'],
                         id_pagamento=row['IdPagamento'],
                         refo_id=row['RefoId'],
@@ -338,7 +310,7 @@ class Command(BaseCommand):
                         nsu=nsu,
                         id_transacao=id_transacao,
                         parcela=row['Parcela'] if str(row['Parcela']).isdigit() else 0,
-                        total_parcelas = row['TotalParcelas'] if str(row['TotalParcelas']).isdigit() else 0,
+                        total_parcelas=row['TotalParcelas'] if str(row['TotalParcelas']).isdigit() else 0,
                         product=product_instance,
                         resumo_venda=resumo_venda,
                         valor_bruto=row['ValorBruto'],
@@ -365,19 +337,154 @@ class Command(BaseCommand):
                         modality=modality_instance,
                         tem_conciliacao_bancaria=True if row['TemConciliacaoBancaria'] == 'Sim' else False,
                         cartao=row['Cartao']
-                    )
-                    
-                    pagamento.save()
-                    
+                    ))
+
                 except Exception as e:
-                    print(f"Erro ao salvar o pagamento no índice {index}, ID {row['Id']} {row['DataPagamento']} {row['DataPrevistaPagamento']} {row['DataVenda']}: {str(e)}")
-                    # Imprime todas as variáveis e seus valores que estão sendo salvos
-                    print("Valores de pagamento que causaram o erro:")
-                    print(vars(pagamento))
+                    print(f"Erro ao processar índice {index}: {e}")
+                    continue  # Pule para a próxima linha no loop caso ocorra um erro
+
+            # Realizando o bulk_create em uma transação para garantir atomicidade
+            try:
+                with transaction.atomic():
+                    Received.objects.bulk_create(recebidos, batch_size=400)  # Ajuste o batch_size conforme necessário
+                self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))
+            except Exception as e:
+                print(f"Erro ao realizar bulk_create: {str(e)}")
+            
+            
+            
+            # self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))              
+            
+        #     for index, row in merged_df.iterrows():
+        #         try:
+        #             # Tente buscar a instância do cliente com base no client_id
+        #             client_instance = Clients.objects.get(id=row['client_id'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"Cliente com ID {row['client_id']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado
+                
+        #         try:
+        #             # Tente buscar a instância do adquirente com base no id
+        #             adquirente_instance = Acquirer.objects.get(id=row['adquirente_id'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"Adquirente com ID {row['adquirente_id']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado  
+                
+        #         try:
+        #             # Tente buscar a instância do produto com base no id
+        #             product_instance = Product.objects.get(id=row['product_id'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"Produto com ID {row['product_id']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado  
+                
+        #         try:
+        #             # Tente buscar a instância do produto com base no id
+        #             banco_instance = Bank.objects.get(id=row['banco'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"Bank com ID {row['banco']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado   
+                
+        #         try:
+        #             # Tente buscar a instância do produto com base no id
+        #             transaction_instance = TransactionType.objects.get(id=row['transaction_id'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"TransactionType com ID {row['transaction_id']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado                               
+
+        #         try:
+        #             # Tente buscar a instância do produto com base no id
+        #             payment_instance = PaymentStatus.objects.get(id=row['payment_status_id'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"PaymentStatus com ID {row['payment_status_id']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado 
+                
+        #         try:
+        #             # Tente buscar a instância do produto com base no id
+        #             modality_instance = Modality.objects.get(id=row['modality_id'])
+        #         except ObjectDoesNotExist:
+        #             # Trate o caso onde o cliente não existe, se necessário
+        #             print(f"Modality com ID {row['modality_id']} não encontrado.")
+        #             continue  # Pula para o próximo loop se o cliente não for encontrado 
+                
+        #         # Verificação e conversão de valores
+        #         autorizacao = str(row['Autorizacao']) if not pd.isna(row['Autorizacao']) else ''
+        #         nsu = str(int(row['Nsu'])) if not pd.isna(row['Nsu']) else ''  # Convertendo de float para inteiro e depois para string
+        #         id_transacao = str(row['Tid']) if not pd.isna(row['Tid']) else ''
+        #         resumo_venda = str(row['ResumoVenda']) if not pd.isna(row['ResumoVenda']) else ''
+        #         outras_despesas = row['OutrasDespesas'] if not pd.isna(row['OutrasDespesas']) else 0
+        #         nome_loja = str(row['NomeLoja']) if not pd.isna(row['NomeLoja']) else ''
+        #         divergencias = str(row['Divergencias']) if not pd.isna(row['Divergencias']) else ''
+        #         observacao = str(row['Observacao']) if not pd.isna(row['Observacao']) else ''
+        #         motivo_ajuste = str(row['MotivoAjuste']) if not pd.isna(row['MotivoAjuste']) else ''
+                
+        #         # Convertendo as datas do DataFrame para o formato desejado
+        #         data_pagamento = datetime.strptime(str(row['DataPagamento']), '%Y-%m-%d') if pd.notna(row['DataPagamento']) else None
+        #         data_prevista_pagamento = datetime.strptime(str(row['DataPrevistaPagamento']), '%Y-%m-%d') if pd.notna(row['DataPrevistaPagamento']) else None
+        #         data_venda = datetime.strptime(str(row['DataVenda']), '%Y-%m-%d') if pd.notna(row['DataVenda']) else None        
+                                    
                     
-                    # Parar o loop após o primeiro erro
-                    # break            
-                    continue
-            self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))
-        else:
-            self.stdout.write(self.style.ERROR(f"Erro na requisição: {response.status_code}"))
+        #         try:
+        #             # Salvando o pagamento
+        #             pagamento = Received(
+        #                 id=row['Id'],
+        #                 id_pagamento=row['IdPagamento'],
+        #                 refo_id=row['RefoId'],
+        #                 client=client_instance,
+        #                 estabelecimento=row['Estabelecimento'],
+        #                 data_pagamento=data_pagamento,
+        #                 data_prevista_pagamento=data_prevista_pagamento,
+        #                 data_venda=data_venda,
+        #                 adquirente=adquirente_instance,
+        #                 autorizacao=autorizacao,
+        #                 nsu=nsu,
+        #                 id_transacao=id_transacao,
+        #                 parcela=row['Parcela'] if str(row['Parcela']).isdigit() else 0,
+        #                 total_parcelas = row['TotalParcelas'] if str(row['TotalParcelas']).isdigit() else 0,
+        #                 product=product_instance,
+        #                 resumo_venda=resumo_venda,
+        #                 valor_bruto=row['ValorBruto'],
+        #                 taxa=row['Taxa'] if not pd.isna(row['Taxa']) else None,
+        #                 outras_despesas=outras_despesas,
+        #                 valor_liquido=row['ValorLiquido'] if not pd.isna(row['ValorLiquido']) else None,
+        #                 idt_antecipacao=row['IdtAntecipacao'],
+        #                 banco=banco_instance,
+        #                 agencia=str(row['Agencia']) if not pd.isna(row['Agencia']) else '',
+        #                 conta=str(row['Conta']) if not pd.isna(row['Conta']) else '',
+        #                 nome_loja=nome_loja,
+        #                 terminal=row['Terminal'],
+        #                 transactiontype=transaction_instance,
+        #                 id_status=payment_instance,
+        #                 divergencias=divergencias,
+        #                 valor_liquido_venda=row['ValorLiquidoVenda'] if not pd.isna(row['ValorLiquidoVenda']) else None,
+        #                 observacao=observacao,
+        #                 motivo_ajuste=motivo_ajuste,
+        #                 conta_adquirente=False if pd.isna(row['ContaAdquirente']) or row['ContaAdquirente'] == '' else True,
+        #                 taxa_antecipacao=row['TaxaAntecipacao'] if not pd.isna(row['TaxaAntecipacao']) else None,
+        #                 taxa_antecipacao_mensal=row['TaxaAntecipacaoMensal'] if not pd.isna(row['TaxaAntecipacaoMensal']) else None,
+        #                 valor_taxa_antecipacao=row['ValorTaxaAntecipacao'] if not pd.isna(row['ValorTaxaAntecipacao']) else None,
+        #                 valor_taxa=row['ValorTaxa'] if not pd.isna(row['ValorTaxa']) else None,
+        #                 modality=modality_instance,
+        #                 tem_conciliacao_bancaria=True if row['TemConciliacaoBancaria'] == 'Sim' else False,
+        #                 cartao=row['Cartao']
+        #             )
+                    
+        #             pagamento.save()
+                    
+        #         except Exception as e:
+        #             print(f"Erro ao salvar o pagamento no índice {index}, ID {row['Id']} {row['DataPagamento']} {row['DataPrevistaPagamento']} {row['DataVenda']}: {str(e)}")
+        #             # Imprime todas as variáveis e seus valores que estão sendo salvos
+        #             print("Valores de pagamento que causaram o erro:")
+        #             print(vars(pagamento))
+                    
+        #             # Parar o loop após o primeiro erro
+        #             # break            
+        #             continue
+        #     self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))
+        # else:
+        #     self.stdout.write(self.style.ERROR(f"Erro na requisição: {response.status_code}"))
