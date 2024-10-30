@@ -25,11 +25,12 @@ from datetime import datetime
 from .serializers import ModalityResultSerializer, SharedLinkSerializer
 from .models import SharedLink, LogExport
 from dotenv import load_dotenv
-
-
-# import logging
+import logging
 
 load_dotenv()
+
+# Configurar o logger
+logger = logging.getLogger(__name__)
 
 class SharedLinkCreateView(generics.CreateAPIView):
     queryset = SharedLink.objects.all()
@@ -126,131 +127,391 @@ class SharedLinkCreateView(generics.CreateAPIView):
         serializer.save(created_by=self.request.user, code_url=unique_code)
 
     def create(self, request, *args, **kwargs):
-        # Chama o método de criação padrão
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        code_url = serializer.instance.code_url
-        pot_econ_acao_01 = serializer.instance.info_action_01
-        pot_econ_acao_02 = serializer.instance.info_action_02
-        pot_econ_acao_03 = serializer.instance.info_action_03
-        pot_econ_01 = serializer.instance.action_01
-        pot_econ_02 = serializer.instance.action_02
-        pot_econ_03 = serializer.instance.action_03
-                
-        # Obter o objeto criado para usar nas operações a seguir
-        user = request.user 
-        shared = serializer.instance
-        client_id = shared.client.pk
-        fantasy_name = shared.client.fantasy_name
-        info_adicional = shared.info
-        date_start = shared.date_start
-        date_end = shared.date_end
-        
-        # Montar o log
-        current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        log_content = f'[{current_time}] - Iniciando a exportação do cliente: {fantasy_name} \n'
-        
-        # Formatar as datas no padrão desejado
-        date_start_formatted = date_start.strftime("%d/%m/%Y")
-        date_end_formatted = date_end.strftime("%d/%m/%Y")
-        periodo_apuracao = f"Período de Apuração \n{date_start_formatted} - {date_end_formatted}"
+        try:
+            # Chama o método de criação padrão
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            code_url = serializer.instance.code_url
+            pot_econ_acao_01 = serializer.instance.info_action_01
+            pot_econ_acao_02 = serializer.instance.info_action_02
+            pot_econ_acao_03 = serializer.instance.info_action_03
+            pot_econ_01 = serializer.instance.action_01
+            pot_econ_02 = serializer.instance.action_02
+            pot_econ_03 = serializer.instance.action_03
+                    
+            # Obter o objeto criado para usar nas operações a seguir
+            user = request.user 
+            shared = serializer.instance
+            client_id = shared.client.pk
+            fantasy_name = shared.client.fantasy_name
+            info_adicional = shared.info
+            date_start = shared.date_start
+            date_end = shared.date_end
+            
+            # Montar o log
+            current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+            log_content = f'[{current_time}] - Iniciando a exportação do cliente: {fantasy_name} \n'
+            
+            # Formatar as datas no padrão desejado
+            date_start_formatted = date_start.strftime("%d/%m/%Y")
+            date_end_formatted = date_end.strftime("%d/%m/%Y")
+            periodo_apuracao = f"Período de Apuração \n{date_start_formatted} - {date_end_formatted}"
 
-        # Filtrar registros de acordo com o client_id e intervalo de data
-        queryset = Received.objects.filter(
-            client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
-        ).values('modality').annotate(
-            valor_bruto_sum=Sum('valor_bruto'),
-            valor_taxa_sum=Sum('valor_taxa')
-        )          
-
-        # Obter informações adicionais
-        client = get_object_or_404(Clients, id=client_id)
-        fantasy_name = client.fantasy_name        
-
-        received_data_view = ReceivedDataView()
-        modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
-        info_numbers = received_data_view.get_info_numbers(queryset, client_id, date_start, date_end)
-        tipo_cartoes_final = received_data_view.get_tipo_cartoes(client_id, date_start, date_end)
-        adquirente_data = received_data_view.get_adquirente(client_id, date_start, date_end)
-        servicos_adicionais_pagos = received_data_view.get_servicos_adicionais_pagos(client_id, date_start, date_end)          
-        quantidade_total_vendas = received_data_view.get_total_vendas(client_id, date_start, date_end)          
-
-        # Calcular o valor bruto total para o client_id e intervalo de datas
-        total_venda_bruta = Received.objects.filter(
-            client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
-        ).aggregate(total=Sum('valor_bruto'))['total'] or 0
-
-        # Calcular venda bruta por tipo de cartão
-        venda_por_tipo_cartao_queryset = (
-            Received.objects.filter(
+            # Filtrar registros de acordo com o client_id e intervalo de data
+            queryset = Received.objects.filter(
                 client_id=client_id,
-                data_pagamento__range=(date_start, date_end),
-                product__type_card__id__isnull=False
+                data_pagamento__range=(date_start, date_end)
+            ).values('modality').annotate(
+                valor_bruto_sum=Sum('valor_bruto'),
+                valor_taxa_sum=Sum('valor_taxa')
+            )          
+
+            # Obter informações adicionais
+            client = get_object_or_404(Clients, id=client_id)
+            fantasy_name = client.fantasy_name        
+
+            received_data_view = ReceivedDataView()
+            modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
+            info_numbers = received_data_view.get_info_numbers(queryset, client_id, date_start, date_end)
+            tipo_cartoes_final = received_data_view.get_tipo_cartoes(client_id, date_start, date_end)
+            adquirente_data = received_data_view.get_adquirente(client_id, date_start, date_end)
+            servicos_adicionais_pagos = received_data_view.get_servicos_adicionais_pagos(client_id, date_start, date_end)          
+            quantidade_total_vendas = received_data_view.get_total_vendas(client_id, date_start, date_end)          
+
+            # Calcular o valor bruto total para o client_id e intervalo de datas
+            total_venda_bruta = Received.objects.filter(
+                client_id=client_id,
+                data_pagamento__range=(date_start, date_end)
+            ).aggregate(total=Sum('valor_bruto'))['total'] or 0
+
+            # Calcular venda bruta por tipo de cartão
+            venda_por_tipo_cartao_queryset = (
+                Received.objects.filter(
+                    client_id=client_id,
+                    data_pagamento__range=(date_start, date_end),
+                    product__type_card__id__isnull=False
+                )
+                .values('product__type_card__id', 'product__type_card__name')
+                .annotate(venda_bruta=Sum('valor_bruto'))
             )
-            .values('product__type_card__id', 'product__type_card__name')
-            .annotate(venda_bruta=Sum('valor_bruto'))
-        )
 
-        # Constrói a lista de resultados para vendaPorTipoCartao
-        venda_por_tipo_cartao = [
-            {
-                "id": entry['product__type_card__id'],
-                "title": entry['product__type_card__name'],
-                "value": round((entry['venda_bruta'] / total_venda_bruta) * 100, 2) if total_venda_bruta > 0 else 0
-            }
-            for entry in venda_por_tipo_cartao_queryset
-        ]
-        
-        # CONECTAR AO ONE DRIVE PARA ALTERAR O EXCEL
-        result = self.get_access_token()
-        
-        if "access_token" in result:
-            log_entry = LogExport()           
-            access_token = result['access_token']
+            # Constrói a lista de resultados para vendaPorTipoCartao
+            venda_por_tipo_cartao = [
+                {
+                    "id": entry['product__type_card__id'],
+                    "title": entry['product__type_card__name'],
+                    "value": round((entry['venda_bruta'] / total_venda_bruta) * 100, 2) if total_venda_bruta > 0 else 0
+                }
+                for entry in venda_por_tipo_cartao_queryset
+            ]
             
-            ##############
-            # Tabela Info
-            # Extrair o valor de antecipacaoDespesa e remover caracteres extras
-            valor_str = info_numbers["antecipacaoDespesa"]["value"]
-            valor_numero = float(re.sub(r'[^\d,]', '', valor_str).replace(',', '.'))
+            # CONECTAR AO ONE DRIVE PARA ALTERAR O EXCEL
+            result = self.get_access_token()
+            
+            if "access_token" in result:
+                log_entry = LogExport()           
+                access_token = result['access_token']
+                
+                ##############
+                # Tabela Info
+                # Extrair o valor de antecipacaoDespesa e remover caracteres extras
+                valor_str = info_numbers["antecipacaoDespesa"]["value"]
+                valor_numero = float(re.sub(r'[^\d,]', '', valor_str).replace(',', '.'))
 
-            # Multiplicar por 12
-            impacto_anual_antecipacao = valor_numero * 12            
-            sheet_name = "Info"
-            range_address = "B1:B4"  # Ajuste o intervalo conforme necessário
-            values = [
-                [fantasy_name],
-                [periodo_apuracao],
-                [impacto_anual_antecipacao],
-                [quantidade_total_vendas]
-            ] 
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            
-            if result_write_values > 0:
+                # Multiplicar por 12
+                impacto_anual_antecipacao = valor_numero * 12            
+                sheet_name = "Info"
+                range_address = "B1:B4"  # Ajuste o intervalo conforme necessário
+                values = [
+                    [fantasy_name],
+                    [periodo_apuracao],
+                    [impacto_anual_antecipacao],
+                    [quantidade_total_vendas]
+                ] 
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    ) 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)
+                                
+                ##############
+                # Tabela PotencialEconomia 
+                sheet_name = "PotencialEconomia"  
+                range_address = "A2:B4" 
+                values = [
+                    [pot_econ_acao_01, pot_econ_01],
+                    [pot_econ_acao_02, pot_econ_02],
+                    [pot_econ_acao_03, pot_econ_03]
+                ]
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                ##############
+                # Tabela TaxaEfetiva 
+                sheet_name = "TaxaEfetiva"  
+                range_address = "A2:B10" 
+                # Montar o array values
+                values = []
+
+                # Adiciona os pares [title, value] ao array values
+                for item in modality_data.data:
+                    values.append([item["title"], float(item["value"])/100])  # Convertendo Decimal para float
+
+                # Preenche com valores padrão se houver menos de 9 linhas
+                while len(values) < 9:
+                    values.append(["", 0.0])  # Preencher com strings vazias e zero (float)
+
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)            
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)            
+                ##############
+                # Tabela Numeros
+                # Extrair o valor de antecipacaoDespesa e remover caracteres extras
+                valor_str = info_numbers["antecipacaoDespesa"]["value"]          
+                sheet_name = "Numeros"
+                range_address = "B1:B9"  # Ajuste o intervalo conforme necessário
+                values = [
+                    [info_numbers["semAntecipacaoVenda"]["value"]],
+                    [info_numbers["semAntecipacaoDespesa"]["value"]],
+                    [info_numbers["semAntecipacaoTaxa"]["value"]],
+                    [info_numbers["antecipacaoVenda"]["value"]],
+                    [info_numbers["antecipacaoDespesa"]["value"]],
+                    [info_numbers["antecipacaoTaxa"]["value"]],
+                    [info_numbers["vendaTotal"]["value"]],
+                    [info_numbers["despesaTotal"]["value"]],
+                    [info_numbers["taxaTotal"]["value"]]
+                ] 
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                        
+                ##############
+                # Tabela VendaDebito 
+                sheet_name = "VendaDebito"  
+                range_address = "A2:C30" 
+                # Montar o array values
+                values = []
+
+                # Acessar os dados de "Debito"
+                debito_items = tipo_cartoes_final[0]["Debito"]
+
+                # Montar o array values com os itens de "Debito"
+                for item in debito_items:
+                    values.append([
+                        item["name"],
+                        float(item["Venda Bruta"]),
+                        float(item["Taxa%"])/100
+                    ])
+
+                # Preenche com valores padrão se houver menos de 30 linhas
+                while len(values) < 29:
+                    values.append(["", "", ""])  
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                    
+                ##############
+                # Tabela VendaCredito 
+                sheet_name = "VendaCredito"  
+                range_address = "A2:C30" 
+                # Montar o array values
+                values = []
+
+                # Acessar os dados de "Crebito"
+                credito_items = tipo_cartoes_final[0]["Credito"]
+
+                # Montar o array values com os itens de "Debito"
+                for item in credito_items:
+                    values.append([
+                        item["name"],
+                        float(item["Venda Bruta"]),
+                        float(item["Taxa%"])/100
+                    ])
+
+                # Preenche com valores padrão se houver menos de 30 linhas
+                while len(values) < 29:
+                    values.append(["", "", ""])  
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                           
+                ##############
+                # Tabela VendaVoucher 
+                sheet_name = "VendaVoucher"  
+                range_address = "A2:C30" 
+                # Montar o array values
+                values = []
+
+                # Acessar os dados de "Voucher"
+                voucher_items = tipo_cartoes_final[0]["Voucher"]
+
+                # Montar o array values com os itens de "Voucher"
+                for item in voucher_items:
+                    values.append([
+                        item["name"],
+                        float(item["Venda Bruta"]),
+                        float(item["Taxa%"])/100
+                    ])
+
+                # Preenche com valores padrão se houver menos de 30 linhas
+                while len(values) < 29:
+                    values.append(["", "", ""])  
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                                
+                ##############
+                # Tabela VendaAdquirente 
+                sheet_name = "VendaAdquirente"  
+                range_address = "A2:C25" 
+                # Montar o array values
+                values = []
+
+                for item in adquirente_data:
+                    values.append([
+                        item["name"],
+                        float(item["Venda Bruta"]),
+                        float(item["Taxa%"])/100
+                    ])
+
+                # Preenche com valores padrão se houver menos de 9 linhas
+                while len(values) < 24:
+                    values.append(["", "", ""])  # Preencher com strings vazias e zero (float) 
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)  
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                                            
+                ##############
+                # Tabela CustosAdicionais 
+                sheet_name = "CustosAdicionais"  
+                range_address = "A2:B16" 
+                # Montar o array values
+                values = []
+
+                for item in servicos_adicionais_pagos:
+                    values.append([
+                        item["name"],
+                        float(item["Valor"])
+                    ])
+
+                # Preenche com valores padrão se houver menos de 9 linhas
+                while len(values) < 15:
+                    values.append(["", ""])  # Preencher com strings vazias e zero (float) 
+                result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
+                if result_write_values > 0:
+                    log_entry.save_log(
+                        user=user,  # Uma instância do usuário que fez a ação
+                        log=log_content,
+                        resultado=False,
+                        client_id=client_id,  # ID do cliente relacionado
+                        date_start=date_start,
+                        date_end=date_end
+                    )                 
+                    return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                                                        
+            else:
+                current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                log_content += f'[{current_time}] - Erro ao obter token para acessar o drive \n'
+                log_entry = LogExport()
                 log_entry.save_log(
                     user=user,  # Uma instância do usuário que fez a ação
                     log=log_content,
                     resultado=False,
+                    client_id=client_id,  # ID do cliente relacionado
+                    date_start=date_start,
+                    date_end=date_end
+                )            
+
+                return JsonResponse({"error": f"Ocorreu um erro ao gerar o dashboard. Tente novamente"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            access_token = result['access_token']
+            resposta_download = self.download_excel(request, access_token)
+            response_data = json.loads(resposta_download.content)        
+
+            if resposta_download.status_code == 200:
+                
+                download_url = response_data['download_url']
+                
+                instance = serializer.instance  # Acesse a instância salva
+                instance.download_url = download_url  # Atualize o campo
+                instance.save()  # Salve novamente para persistir a atualização            
+                
+                current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                log_content += f'[{current_time}] - Exportação gerada com successo \n'
+                
+                log_entry = LogExport()
+                log_entry.save_log(
+                    user=user,  # Uma instância do usuário que fez a ação
+                    log=log_content,
+                    resultado=True,
                     client_id=client_id,  # ID do cliente relacionado
                     date_start=date_start,
                     date_end=date_end
                 ) 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)
-                            
-            ##############
-            # Tabela PotencialEconomia 
-            sheet_name = "PotencialEconomia"  
-            range_address = "A2:B4" 
-            values = [
-                [pot_econ_acao_01, pot_econ_01],
-                [pot_econ_acao_02, pot_econ_02],
-                [pot_econ_acao_03, pot_econ_03]
-            ]
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            if result_write_values > 0:
+            else:
+                error_message = response_data['error']
+                current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                log_content += f'[{current_time}] - Erro ao fazer download do dashboard:{error_message} \n'
+                log_entry = LogExport()
                 log_entry.save_log(
                     user=user,  # Uma instância do usuário que fez a ação
                     log=log_content,
@@ -258,268 +519,13 @@ class SharedLinkCreateView(generics.CreateAPIView):
                     client_id=client_id,  # ID do cliente relacionado
                     date_start=date_start,
                     date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            ##############
-            # Tabela TaxaEfetiva 
-            sheet_name = "TaxaEfetiva"  
-            range_address = "A2:B10" 
-            # Montar o array values
-            values = []
-
-            # Adiciona os pares [title, value] ao array values
-            for item in modality_data.data:
-                values.append([item["title"], float(item["value"])/100])  # Convertendo Decimal para float
-
-            # Preenche com valores padrão se houver menos de 9 linhas
-            while len(values) < 9:
-                values.append(["", 0.0])  # Preencher com strings vazias e zero (float)
-
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)            
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)            
-            ##############
-            # Tabela Numeros
-            # Extrair o valor de antecipacaoDespesa e remover caracteres extras
-            valor_str = info_numbers["antecipacaoDespesa"]["value"]          
-            sheet_name = "Numeros"
-            range_address = "B1:B9"  # Ajuste o intervalo conforme necessário
-            values = [
-                [info_numbers["semAntecipacaoVenda"]["value"]],
-                [info_numbers["semAntecipacaoDespesa"]["value"]],
-                [info_numbers["semAntecipacaoTaxa"]["value"]],
-                [info_numbers["antecipacaoVenda"]["value"]],
-                [info_numbers["antecipacaoDespesa"]["value"]],
-                [info_numbers["antecipacaoTaxa"]["value"]],
-                [info_numbers["vendaTotal"]["value"]],
-                [info_numbers["despesaTotal"]["value"]],
-                [info_numbers["taxaTotal"]["value"]]
-            ] 
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                        
-            ##############
-            # Tabela VendaDebito 
-            sheet_name = "VendaDebito"  
-            range_address = "A2:C30" 
-            # Montar o array values
-            values = []
-
-            # Acessar os dados de "Debito"
-            debito_items = tipo_cartoes_final[0]["Debito"]
-
-            # Montar o array values com os itens de "Debito"
-            for item in debito_items:
-                values.append([
-                    item["name"],
-                    float(item["Venda Bruta"]),
-                    float(item["Taxa%"])/100
-                ])
-
-            # Preenche com valores padrão se houver menos de 30 linhas
-            while len(values) < 29:
-                values.append(["", "", ""])  
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                    
-            ##############
-            # Tabela VendaCredito 
-            sheet_name = "VendaCredito"  
-            range_address = "A2:C30" 
-            # Montar o array values
-            values = []
-
-            # Acessar os dados de "Crebito"
-            credito_items = tipo_cartoes_final[0]["Credito"]
-
-            # Montar o array values com os itens de "Debito"
-            for item in credito_items:
-                values.append([
-                    item["name"],
-                    float(item["Venda Bruta"]),
-                    float(item["Taxa%"])/100
-                ])
-
-            # Preenche com valores padrão se houver menos de 30 linhas
-            while len(values) < 29:
-                values.append(["", "", ""])  
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                           
-            ##############
-            # Tabela VendaVoucher 
-            sheet_name = "VendaVoucher"  
-            range_address = "A2:C30" 
-            # Montar o array values
-            values = []
-
-            # Acessar os dados de "Voucher"
-            voucher_items = tipo_cartoes_final[0]["Voucher"]
-
-            # Montar o array values com os itens de "Voucher"
-            for item in voucher_items:
-                values.append([
-                    item["name"],
-                    float(item["Venda Bruta"]),
-                    float(item["Taxa%"])/100
-                ])
-
-            # Preenche com valores padrão se houver menos de 30 linhas
-            while len(values) < 29:
-                values.append(["", "", ""])  
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                                
-            ##############
-            # Tabela VendaAdquirente 
-            sheet_name = "VendaAdquirente"  
-            range_address = "A2:C25" 
-            # Montar o array values
-            values = []
-
-            for item in adquirente_data:
-                values.append([
-                    item["name"],
-                    float(item["Venda Bruta"]),
-                    float(item["Taxa%"])/100
-                ])
-
-            # Preenche com valores padrão se houver menos de 9 linhas
-            while len(values) < 24:
-                values.append(["", "", ""])  # Preencher com strings vazias e zero (float) 
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)  
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                                            
-            ##############
-            # Tabela CustosAdicionais 
-            sheet_name = "CustosAdicionais"  
-            range_address = "A2:B16" 
-            # Montar o array values
-            values = []
-
-            for item in servicos_adicionais_pagos:
-                values.append([
-                    item["name"],
-                    float(item["Valor"])
-                ])
-
-            # Preenche com valores padrão se houver menos de 9 linhas
-            while len(values) < 15:
-                values.append(["", ""])  # Preencher com strings vazias e zero (float) 
-            result_write_values, log_content = self.write_values(access_token, sheet_name, range_address, values, log_content)
-            if result_write_values > 0:
-                log_entry.save_log(
-                    user=user,  # Uma instância do usuário que fez a ação
-                    log=log_content,
-                    resultado=False,
-                    client_id=client_id,  # ID do cliente relacionado
-                    date_start=date_start,
-                    date_end=date_end
-                )                 
-                return Response({'message': 'Ocorreu um erro ao exportar o dashboard. Tente novamente.'}, status=status.HTTP_400_BAD_REQUEST)                                                                        
-        else:
-            current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-            log_content += f'[{current_time}] - Erro ao obter token para acessar o drive \n'
-            log_entry = LogExport()
-            log_entry.save_log(
-                user=user,  # Uma instância do usuário que fez a ação
-                log=log_content,
-                resultado=False,
-                client_id=client_id,  # ID do cliente relacionado
-                date_start=date_start,
-                date_end=date_end
-            )            
-
-            return JsonResponse({"error": f"Ocorreu um erro ao gerar o dashboard. Tente novamente"}, status=status.HTTP_400_BAD_REQUEST)
-            
-        access_token = result['access_token']
-        resposta_download = self.download_excel(request, access_token)
-        response_data = json.loads(resposta_download.content)        
-
-        if resposta_download.status_code == 200:
-            
-            download_url = response_data['download_url']
-            
-            instance = serializer.instance  # Acesse a instância salva
-            instance.download_url = download_url  # Atualize o campo
-            instance.save()  # Salve novamente para persistir a atualização            
-            
-            current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-            log_content += f'[{current_time}] - Exportação gerada com successo \n'
-            
-            log_entry = LogExport()
-            log_entry.save_log(
-                user=user,  # Uma instância do usuário que fez a ação
-                log=log_content,
-                resultado=True,
-                client_id=client_id,  # ID do cliente relacionado
-                date_start=date_start,
-                date_end=date_end
-            ) 
-        else:
-            error_message = response_data['error']
-            current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-            log_content += f'[{current_time}] - Erro ao fazer download do dashboard:{error_message} \n'
-            log_entry = LogExport()
-            log_entry.save_log(
-                user=user,  # Uma instância do usuário que fez a ação
-                log=log_content,
-                resultado=False,
-                client_id=client_id,  # ID do cliente relacionado
-                date_start=date_start,
-                date_end=date_end
-            )                   
-            
-        return resposta_download
+                )                   
+                
+            return resposta_download
+        except Exception as e:
+            # Registrar o erro
+            logger.error(f'Erro ao criar o link compartilhado: {str(e)}')
+            return Response({'error': 'Ocorreu um erro ao criar o link compartilhado.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
 
 # class SharedLinkCreateView(generics.CreateAPIView):
 #     queryset = SharedLink.objects.all()
