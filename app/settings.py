@@ -202,11 +202,22 @@ import os
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
             'filename': os.path.join(BASE_DIR, 'logs/error.log'),  # caminho do arquivo de log
+            'formatter': 'verbose',  # Usando o formatter verbose
         },
     },
     'loggers': {
@@ -217,4 +228,5 @@ LOGGING = {
         },
     },
 }
+
 
