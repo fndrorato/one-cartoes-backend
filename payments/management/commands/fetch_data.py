@@ -141,11 +141,11 @@ class Command(BaseCommand):
         # Seu código de coleta de dados aqui, ou use a função `fetch_and_save_data` que definimos antes.
         url = "https://api.conciliadora.com.br/api/ConsultaPagamento"
         # group = Groups.objects.first()
-        group = Groups.objects.get(pk=2)
+        group = Groups.objects.get(pk=1)
         token = group.token
         print(token)
 
-        params = {"$filter": "DataPagamento ge 2024-10-29 and DataPagamento le 2024-10-30"}
+        params = {"$filter": "DataPagamento eq 2024-10-31"}
         headers = {"Content-Type": "application/json", "Authorization": f"{token}"}
 
         response = requests.get(url, headers=headers, params=params)
@@ -380,8 +380,17 @@ class Command(BaseCommand):
 
             # Realizando o bulk_create em uma transação para garantir atomicidade
             try:
+                # Filtrar registros que já existem com o ID do cliente e data de pagamento igual a hoje
+                registros_existentes = Received.objects.filter(
+                    client_id=1,  # Substitua com o ID do cliente
+                    data_pagamento='2024-10-31'
+                ).values_list('id', flat=True)  # Obtém apenas os IDs dos registros existentes
+
+                # Filtrar o `recebidos` para remover os itens que já estão no queryset
+                recebidos_filtrados = [item for item in recebidos if item.id not in registros_existentes]
+                
                 with transaction.atomic():
-                    Received.objects.bulk_create(recebidos, batch_size=400)  # Ajuste o batch_size conforme necessário
+                    Received.objects.bulk_create(recebidos_filtrados, batch_size=400)  # Ajuste o batch_size conforme necessário
                 self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))
             except Exception as e:
                 print(f"Erro ao realizar bulk_create: {str(e)}")

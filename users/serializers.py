@@ -58,13 +58,15 @@ class CustomUserSerializer(serializers.ModelSerializer):
         return user
     
     def send_welcome_email(self, full_name, email, raw_password):
-        subject = "Bem-vindo ao nosso serviço"
+        subject = "One Conciliadora - Bem-vindo ao nosso serviço"
         message = f'''
         Olá {full_name},
 
-        Bem-vindo ao nosso serviço! Seu usuário é {email} e sua senha provisória é {raw_password}
+        Bem-vindo ao nosso serviço! Seu usuário é {email} e sua senha provisória é: {raw_password}
 
         Recomendamos que você altere sua senha após o primeiro acesso.
+        
+        Acesse {settings.FRONTEND_URL}
 
         Atenciosamente,
         Sua Equipe
