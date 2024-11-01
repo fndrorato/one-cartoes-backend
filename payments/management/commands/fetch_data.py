@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
+from django.db import transaction, IntegrityError
 import requests
 import numpy as np
 import pandas as pd
@@ -140,11 +140,12 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         # Seu código de coleta de dados aqui, ou use a função `fetch_and_save_data` que definimos antes.
         url = "https://api.conciliadora.com.br/api/ConsultaPagamento"
-        group = Groups.objects.first()
+        # group = Groups.objects.first()
+        group = Groups.objects.get(pk=2)
         token = group.token
         print(token)
 
-        params = {"$filter": "DataPagamento ge 2024-09-01 and DataPagamento le 2024-09-30"}
+        params = {"$filter": "DataPagamento ge 2024-10-29 and DataPagamento le 2024-10-30"}
         headers = {"Content-Type": "application/json", "Authorization": f"{token}"}
 
         response = requests.get(url, headers=headers, params=params)
@@ -243,7 +244,27 @@ class Command(BaseCommand):
 
 
             # corrigindo o MERGED_DF com os products id/code
-            merged_df = pd.merge(merged_df, products_df[['code', 'product_id']], left_on='CodigoProduto', right_on='code', how='left') 
+            try:
+                # Converte ambas as colunas para string para evitar conflitos de tipo
+                merged_df['CodigoProduto'] = merged_df['CodigoProduto'].astype(str)
+                products_df['code'] = products_df['code'].astype(str)
+
+                # Realiza o merge dos DataFrames
+                merged_df = pd.merge(
+                    merged_df,
+                    products_df[['code', 'product_id']],
+                    left_on='CodigoProduto',
+                    right_on='code',
+                    how='left'
+                )
+            except ValueError as e:
+                # Caso ocorra um erro, imprime os DataFrames e a mensagem de erro
+                print("Erro ao fazer merge:", e)
+                print("merged_df:")
+                print(merged_df.head())
+                print("products_df:")
+                print(products_df.head())
+                
             merged_df = pd.merge(merged_df, transaction_types_df[['transaction_id']], left_on='IdTipoTransacao', right_on='transaction_id', how='left')
             merged_df = pd.merge(merged_df, modalities_df[['code', 'modality_id']], left_on='IdModalidade', right_on='code', how='left')
             merged_df = pd.merge(merged_df, payment_status_df[['code', 'payment_status_id']], left_on='IdStatus', right_on='code', how='left')
@@ -263,6 +284,20 @@ class Command(BaseCommand):
 
             # Lista para armazenar objetos `Received`
             recebidos = []
+            
+            # Armazena o número de linhas antes de remover duplicatas
+            num_linhas_antes = len(merged_df)
+
+            # Remove todas as duplicatas do DataFrame
+            merged_df = merged_df.drop_duplicates()
+
+            # Armazena o número de linhas após a remoção
+            num_linhas_depois = len(merged_df)
+
+            # Calcula quantas duplicatas foram removidas
+            num_duplicatas_removidas = num_linhas_antes - num_linhas_depois
+
+            print(f"Número de duplicatas removidas: {num_duplicatas_removidas}")           
 
             for index, row in merged_df.iterrows():
                 try:
@@ -350,6 +385,8 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))
             except Exception as e:
                 print(f"Erro ao realizar bulk_create: {str(e)}")
+            
+         
             
             
             

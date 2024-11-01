@@ -89,7 +89,7 @@ class Received(models.Model):
     parcela = models.IntegerField(default=0) # Número da parcela
     total_parcelas = models.IntegerField(default=0) # Número Total das parcelas
     product = models.ForeignKey(Product, on_delete=models.RESTRICT)
-    resumo_venda = models.CharField(max_length=100, null=True, blank=True)
+    resumo_venda = models.CharField(max_length=250, null=True, blank=True)
     valor_bruto = models.DecimalField(max_digits=10, decimal_places=2)
     taxa = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True) # Porcentagem da taxa por transação
     outras_despesas = models.DecimalField(max_digits=10, decimal_places=2) # Valor de outras despesas
@@ -102,10 +102,10 @@ class Received(models.Model):
     terminal = models.CharField(max_length=50, null=True, blank=True) # Identificador do terminal de venda
     transactiontype = models.ForeignKey(TransactionType, on_delete=models.RESTRICT)
     id_status = models.ForeignKey(PaymentStatus, on_delete=models.RESTRICT) # identificador do status
-    divergencias = models.CharField(max_length=100, null=True, blank=True)
+    divergencias = models.CharField(max_length=250, null=True, blank=True)
     valor_liquido_venda = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    observacao  = models.CharField(max_length=100, null=True, blank=True)
-    motivo_ajuste  = models.CharField(max_length=100, null=True, blank=True)
+    observacao  = models.CharField(max_length=250, null=True, blank=True)
+    motivo_ajuste  = models.CharField(max_length=250, null=True, blank=True)
     conta_adquirente = models.BooleanField(null=True, blank=True)
     taxa_antecipacao = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     taxa_antecipacao_mensal = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)

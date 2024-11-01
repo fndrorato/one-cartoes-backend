@@ -627,17 +627,17 @@ class ReceivedDataView(APIView):
         total_vendas = Received.objects.filter(
             client_id=client_id,
             data_pagamento__range=(date_start, date_end),
-            valor_liquido__gte=0  # Adiciona a condição para valor_liquido >= 0
+            valor_bruto__gte=0  # Adiciona a condição para valor_liquido >= 0
         ).count()  # Conta o número de linhas que atendem ao filtro
 
         return total_vendas  # Retorna o total de vendas
      
-    
     def get_modality_numbers(self, client_id, date_start, date_end):
         # Filtra os registros de acordo com client_id e intervalo de data
         queryset = Received.objects.filter(
             client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
+            data_pagamento__range=(date_start, date_end),
+            valor_bruto__gte=0
         ).values('modality').annotate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -707,7 +707,8 @@ class ReceivedDataView(APIView):
         antecipacao_false = queryset.filter(
             idt_antecipacao=False,
             client_id=client_id,
-            data_pagamento__range=(date_start, date_end)            
+            data_pagamento__range=(date_start, date_end),
+            valor_bruto__gte=0           
         ).aggregate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -717,19 +718,22 @@ class ReceivedDataView(APIView):
 
         # Agregação para quando idt_antecipacao é True
         antecipacao_true = queryset.filter(
-            idt_antecipacao=True,
             client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
+            data_pagamento__range=(date_start, date_end),            
+            idt_antecipacao=True,
+            valor_bruto__gte=0   
         ).aggregate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
         )
+        
         info_numbers["antecipacaoVenda"], info_numbers["antecipacaoDespesa"], info_numbers["antecipacaoTaxa"] = self.create_info_numbers(antecipacao_true, "true", formatado)
         
         # Soma total sem filtro
         total_received = Received.objects.filter(
             client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
+            data_pagamento__range=(date_start, date_end),
+            valor_bruto__gte=0
         ).aggregate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -744,7 +748,8 @@ class ReceivedDataView(APIView):
         queryset = (
             Received.objects.filter(
                 client_id=client_id,
-                data_pagamento__range=(date_start, date_end)
+                data_pagamento__range=(date_start, date_end),
+                valor_bruto__gte=0
             ).values(
                 'product__type_card__name',  # Nome do tipo de cartão
                 'product__name'              # Nome do produto
@@ -795,7 +800,8 @@ class ReceivedDataView(APIView):
         acquirer_queryset = (
             Received.objects.filter(
                 client_id=client_id,
-                data_pagamento__range=(date_start, date_end)
+                data_pagamento__range=(date_start, date_end),
+                valor_bruto__gte=0
             ).values(
                 'adquirente__name'  # Nome do adquirente
             )
@@ -923,7 +929,6 @@ class ReceivedDataView(APIView):
         
         return servicos_adicionais_pagos    
                 
-    
     def get(self, request):
         client_id = request.query_params.get('client_id')
         date_start = request.query_params.get('date_start')
@@ -943,11 +948,9 @@ class ReceivedDataView(APIView):
         # Filtra os registros de acordo com client_id e intervalo de data
         queryset = Received.objects.filter(
             client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
-        ).values('modality').annotate(
-            valor_bruto_sum=Sum('valor_bruto'),
-            valor_taxa_sum=Sum('valor_taxa')
-        )
+            data_pagamento__range=(date_start, date_end),
+            valor_bruto__gte=0
+        )       
 
         # # Serializa o resultado e retorna a resposta JSON
         modality_data = self.get_modality_numbers(client_id, date_start, date_end)
@@ -959,7 +962,8 @@ class ReceivedDataView(APIView):
         # Primeiro, calcula o valor bruto total para o client_id e no intervalo de datas
         total_venda_bruta = Received.objects.filter(
             client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
+            data_pagamento__range=(date_start, date_end),
+            valor_bruto__gte=0
         ).aggregate(total=Sum('valor_bruto'))['total'] or 0
 
         # Em seguida, calcula a venda bruta por tipo de cartão
@@ -967,6 +971,7 @@ class ReceivedDataView(APIView):
             Received.objects.filter(
                 client_id=client_id,
                 data_pagamento__range=(date_start, date_end),
+                valor_bruto__gte=0,
                 product__type_card__id__isnull=False  # Filtra para garantir que o ID do tipo de cartão não seja nulo
             )
             .values('product__type_card__id', 'product__type_card__name')  # Agrupa pelo ID e título do type_card
@@ -1150,11 +1155,9 @@ class ExportDashboardView(generics.CreateAPIView):
             # Filtrar registros de acordo com o client_id e intervalo de data
             queryset = Received.objects.filter(
                 client_id=client_id,
-                data_pagamento__range=(date_start, date_end)
-            ).values('modality').annotate(
-                valor_bruto_sum=Sum('valor_bruto'),
-                valor_taxa_sum=Sum('valor_taxa')
-            )          
+                data_pagamento__range=(date_start, date_end),
+                valor_bruto__gte=0
+            )        
 
             # Obter informações adicionais
             client = get_object_or_404(Clients, id=client_id)
