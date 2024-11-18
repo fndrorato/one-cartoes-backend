@@ -117,3 +117,8 @@ class Received(models.Model):
 
     def __str__(self):
         return f'{self.client.name} - {self.id} - {self.data_pagamento.strftime("%Y-%m-%d") if self.data_pagamento else "Data não disponível"}'
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['client', 'data_pagamento']),
+        ]    

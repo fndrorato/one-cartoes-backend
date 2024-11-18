@@ -8,7 +8,7 @@ User = get_user_model()
 
 class LogExport(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_log_dashboard')
-    client = models.ForeignKey(Clients, on_delete=models.CASCADE, related_name='log_exported_client')
+    client = models.JSONField(default=list, blank=True, null=True)
     log = models.TextField(null=True, blank=True)
     resultado = models.BooleanField(default=True)
     date_start = models.DateField()
@@ -16,13 +16,13 @@ class LogExport(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"{self.user.full_name} - {self.client.fantasy_name} - {'Sucesso' if self.resultado else 'Falha'}"
+        return f"{self.user.full_name} - {self.client} - {'Sucesso' if self.resultado else 'Falha'}"
     
-    def save_log(self, user, log, resultado, client_id, date_start, date_end):
+    def save_log(self, user, log, resultado, client, date_start, date_end):
         self.user = user
         self.log = log
         self.resultado = resultado
-        self.client_id = client_id
+        self.client = client
         self.date_start = date_start
         self.date_end = date_end
         self.created_at = timezone.now()
@@ -31,7 +31,7 @@ class LogExport(models.Model):
 
 class SharedLink(models.Model):
     code_url = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # Gera um código único
-    client = models.ForeignKey(Clients, on_delete=models.CASCADE, related_name='shared_links')
+    client = models.JSONField(default=list, blank=True, null=True)
     info = models.TextField(null=True, blank=True)
     date_start = models.DateField()
     date_end = models.DateField()

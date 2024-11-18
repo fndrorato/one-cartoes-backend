@@ -40,7 +40,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
-    last_client_id = models.IntegerField(default=0, null=True, blank=True)
+    last_client_id = models.JSONField(default=list, blank=True, null=True)
     last_start_date = models.DateField(null=True, blank=True)
     last_end_date = models.DateField(null=True, blank=True)
     profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)  # Novo campo de imagem

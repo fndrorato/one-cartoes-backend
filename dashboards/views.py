@@ -625,7 +625,7 @@ class ReceivedDataView(APIView):
     def get_total_vendas(self, client_id, date_start, date_end):
         # Filtra os registros de acordo com client_id e intervalo de data
         total_vendas = Received.objects.filter(
-            client_id=client_id,
+            client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0  # Adiciona a condição para valor_liquido >= 0
         ).count()  # Conta o número de linhas que atendem ao filtro
@@ -635,7 +635,7 @@ class ReceivedDataView(APIView):
     def get_modality_numbers(self, client_id, date_start, date_end):
         # Filtra os registros de acordo com client_id e intervalo de data
         queryset = Received.objects.filter(
-            client_id=client_id,
+            client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
         ).values('modality').annotate(
@@ -706,7 +706,7 @@ class ReceivedDataView(APIView):
         # Agregação para quando idt_antecipacao é False
         antecipacao_false = queryset.filter(
             idt_antecipacao=False,
-            client_id=client_id,
+            client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0           
         ).aggregate(
@@ -718,7 +718,7 @@ class ReceivedDataView(APIView):
 
         # Agregação para quando idt_antecipacao é True
         antecipacao_true = queryset.filter(
-            client_id=client_id,
+            client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),            
             idt_antecipacao=True,
             valor_bruto__gte=0   
@@ -731,7 +731,7 @@ class ReceivedDataView(APIView):
         
         # Soma total sem filtro
         total_received = Received.objects.filter(
-            client_id=client_id,
+            client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
         ).aggregate(
@@ -747,7 +747,7 @@ class ReceivedDataView(APIView):
         # Query que agrupa os dados por `type_card` e produto
         queryset = (
             Received.objects.filter(
-                client_id=client_id,
+                client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0
             ).values(
@@ -799,7 +799,7 @@ class ReceivedDataView(APIView):
         # Query que agrupa os dados por `acquirer`
         acquirer_queryset = (
             Received.objects.filter(
-                client_id=client_id,
+                client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0
             ).values(
@@ -837,7 +837,7 @@ class ReceivedDataView(APIView):
         # Query que agrupa os dados por `observacao`, somando `valor_liquido` onde for menor que 0
         observation_queryset = (
             Received.objects.filter(
-                client_id=client_id,
+                client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_liquido__lt=0  # Filtra para incluir apenas valores líquidos menores que 0
             )
@@ -883,7 +883,7 @@ class ReceivedDataView(APIView):
         # Query que agrupa os dados por `observacao`, somando `valor_liquido` onde for menor que 0
         observation_queryset = (
             Received.objects.filter(
-                client_id=client_id,
+                client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_liquido__lt=0  # Filtra para incluir apenas valores líquidos menores que 0
             )
@@ -933,10 +933,16 @@ class ReceivedDataView(APIView):
         client_id = request.query_params.get('client_id')
         date_start = request.query_params.get('date_start')
         date_end = request.query_params.get('date_end')
-
+        
         # Verifica se todos os parâmetros obrigatórios foram fornecidos
         if not (client_id and date_start and date_end):
             return Response({"error": "Parâmetros insuficientes."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Processa o client_id como um vetor
+        try:
+            client_ids = [int(cid) for cid in client_id.split(',')]  # Converte cada valor para inteiro
+        except ValueError:
+            return Response({"error": "client_id deve ser uma lista de inteiros, por exemplo: 1 ou 1,3."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Converte strings de data para objetos datetime
         try:
@@ -947,21 +953,21 @@ class ReceivedDataView(APIView):
 
         # Filtra os registros de acordo com client_id e intervalo de data
         queryset = Received.objects.filter(
-            client_id=client_id,
+            client_id__in=client_ids,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
-        )       
+        )    
 
         # # Serializa o resultado e retorna a resposta JSON
-        modality_data = self.get_modality_numbers(client_id, date_start, date_end)
-        info_numbers = self.get_info_numbers(queryset, client_id, date_start, date_end)
-        tipo_cartoes_final = self.get_tipo_cartoes(client_id, date_start, date_end)
-        adquirente_data = self.get_adquirente(client_id, date_start, date_end)
-        servicos_adicionais_pagos = self.get_servicos_adicionais_pagos(client_id, date_start, date_end)
+        modality_data = self.get_modality_numbers(client_ids, date_start, date_end)
+        info_numbers = self.get_info_numbers(queryset, client_ids, date_start, date_end)
+        tipo_cartoes_final = self.get_tipo_cartoes(client_ids, date_start, date_end)
+        adquirente_data = self.get_adquirente(client_ids, date_start, date_end)
+        servicos_adicionais_pagos = self.get_servicos_adicionais_pagos(client_ids, date_start, date_end) 
         
         # Primeiro, calcula o valor bruto total para o client_id e no intervalo de datas
         total_venda_bruta = Received.objects.filter(
-            client_id=client_id,
+            client_id__in=client_ids,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
         ).aggregate(total=Sum('valor_bruto'))['total'] or 0
@@ -969,7 +975,7 @@ class ReceivedDataView(APIView):
         # Em seguida, calcula a venda bruta por tipo de cartão
         venda_por_tipo_cartao_queryset = (
             Received.objects.filter(
-                client_id=client_id,
+                client_id__in=client_ids,
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0,
                 product__type_card__id__isnull=False  # Filtra para garantir que o ID do tipo de cartão não seja nulo
@@ -1138,14 +1144,14 @@ class ExportDashboardView(generics.CreateAPIView):
             # Obter o objeto criado para usar nas operações a seguir
             user = request.user 
             shared = serializer.instance
-            client_id = shared.client.pk
-            fantasy_name = shared.client.fantasy_name
+            client_id = shared.client
+            # fantasy_name = shared.client.fantasy_name
             date_start = shared.date_start
             date_end = shared.date_end
             
             # Montar o log
             current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-            log_content = f'[{current_time}] - Iniciando a exportação do cliente: {fantasy_name} \n'
+            log_content = f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             
             # Formatar as datas no padrão desejado
             date_start_formatted = date_start.strftime("%d/%m/%Y")
@@ -1154,14 +1160,14 @@ class ExportDashboardView(generics.CreateAPIView):
 
             # Filtrar registros de acordo com o client_id e intervalo de data
             queryset = Received.objects.filter(
-                client_id=client_id,
+                client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0
             )        
 
             # Obter informações adicionais
-            client = get_object_or_404(Clients, id=client_id)
-            fantasy_name = client.fantasy_name        
+            # client = get_object_or_404(Clients, id=client_id)
+            # fantasy_name = client.fantasy_name        
 
             received_data_view = ReceivedDataView()
             modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
@@ -1389,20 +1395,20 @@ class ExportDashboardView(generics.CreateAPIView):
                 user=user,  # Uma instância do usuário que fez a ação
                 log=log_content,
                 resultado=True,
-                client_id=client_id,  # ID do cliente relacionado
+                client=client_id,  # ID do cliente relacionado
                 date_start=date_start,
                 date_end=date_end
             )             
 
             # Configurar a resposta para o download do arquivo
-            fantasy_name_cleaned = re.sub(r'[^A-Za-z0-9]', '', fantasy_name.title().replace(" ", ""))
+            # fantasy_name_cleaned = re.sub(r'[^A-Za-z0-9]', '', fantasy_name.title().replace(" ", ""))
             
             # Converter datas para o formato DDMMYYYY
             date_start_str = date_start.strftime('%d%m%Y')
             date_end_str = date_end.strftime('%d%m%Y')
             
             # Gerar o nome do arquivo final
-            filename = f"{fantasy_name_cleaned}_{date_start_str}_{date_end_str}.xlsx"            
+            filename = f"dadosDashboard_{date_start_str}_{date_end_str}.xlsx"            
 
             file_path = os.path.join(settings.MEDIA_ROOT, 'exported_dashboards', filename)
 

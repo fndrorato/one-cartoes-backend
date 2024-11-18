@@ -64,12 +64,16 @@ class CustomTokenView(TokenObtainPairView, TokenRefreshView):
             clients = Clients.objects.all() 
 
             # Formatar a lista de clientes
-            clients_data = [{'id': client.id, 'fantasy_name': client.fantasy_name} for client in clients]
-            
+            clients_data = sorted(
+                [{'id': client.id, 'fantasy_name': client.fantasy_name} for client in clients],
+                key=lambda x: x['fantasy_name']
+            )
+
             if not user.last_client_id and clients_data:
                 user.last_client_id = clients_data[0]['id']
                 user.save(update_fields=['last_client_id'])  # Salva a mudança no banco de dados
             
+            client_ids = user.last_client_id
             
             response_data = {
                 'id': 11,
@@ -80,7 +84,7 @@ class CustomTokenView(TokenObtainPairView, TokenRefreshView):
                 'phone': user.phone,   
                 'role': 'admin',  # Altere para o papel correto                
                 'token': response.data['access'],
-                'id_client_selected': user.last_client_id,
+                'id_client_selected': client_ids,
                 'start_date': user.last_start_date,
                 'start_date': user.last_end_date,
                 'clients': clients_data
@@ -148,12 +152,18 @@ class CustomTokenView(TokenObtainPairView, TokenRefreshView):
         clients = Clients.objects.all() 
 
         # Formatar a lista de clientes
-        clients_data = [{'id': client.id, 'fantasy_name': client.fantasy_name} for client in clients]
+        clients_data = sorted(
+            [{'id': client.id, 'fantasy_name': client.fantasy_name} for client in clients],
+            key=lambda x: x['fantasy_name']
+        )
+
         
         if not user.last_client_id and clients_data:
             user.last_client_id = clients_data[0]['id']
             user.save(update_fields=['last_client_id'])  # Salva a mudança no banco de dados
-                        
+        
+        client_ids = user.last_client_id
+                                
         response_data = {
             'id': user.id,
             'uid': user.id,
@@ -163,12 +173,12 @@ class CustomTokenView(TokenObtainPairView, TokenRefreshView):
             'phone': user.phone,                  
             'role': 'admin',  # Altere para o papel correto                
             'token': access_token, 
-            'id_client_selected': user.last_client_id,
+            'id_client_selected': client_ids,
             'start_date': user.last_start_date,
             'end_date': user.last_end_date,
             'clients': clients_data            
         }
-
+        
         return Response(response_data, status=status.HTTP_200_OK)
 
     def get_user_data(self, email):
@@ -297,6 +307,7 @@ class UserChangeClientUpdateView(APIView):
 
     def put(self, request, *args, **kwargs):
         user = self.request.user  # O usuário autenticado vem do token JWT
+        print(request.data)
         serializer = UserLastClientUpdateSerializer(user, data=request.data, partial=True)  # partial=True permite atualização parcial
         if serializer.is_valid():
             serializer.save()
