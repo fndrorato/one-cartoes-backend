@@ -17,6 +17,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Sum, OuterRef, Subquery, FloatField
 from django.http import HttpResponse
+from decimal import Decimal
 from openpyxl import load_workbook
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -792,6 +793,16 @@ class ReceivedDataView(APIView):
 
         # Ajusta a estrutura final para retornar apenas um dicionário
         tipo_cartoes_final = [tipo_cartoes]  # Coloca em uma lista como requerido
+        # Valores padrão para Voucher
+        default_valor = [{'name': 'Sem valores', 'Venda Bruta': Decimal('0'), 'Taxa R$': Decimal('0'), 'Taxa%': Decimal('0')}]
+        # Verificar e adicionar a chave 'Voucher' se necessário
+        for item in tipo_cartoes_final:
+            if 'Voucher' not in item:
+                item['Voucher'] = default_valor
+            if 'Credito' not in item:        
+                item['Credito'] = default_valor
+            if 'Debito' not in item:        
+                item['Debito'] = default_valor
  
         return tipo_cartoes_final        
     

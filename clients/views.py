@@ -13,7 +13,7 @@ class GroupListCreateView(generics.ListCreateAPIView):
         serializer.save(created_by=self.request.user)
 
 class GroupDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Groups.objects.all()
+    queryset = Groups.objects.all().order_by('name')
     serializer_class = GroupsSerializer
     permission_classes = [IsAuthenticated]  # Garante que o usuário está autenticado
 
