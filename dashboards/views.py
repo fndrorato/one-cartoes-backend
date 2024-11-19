@@ -1179,20 +1179,14 @@ class ExportDashboardView(generics.CreateAPIView):
             # Obter informações adicionais
             # client = get_object_or_404(Clients, id=client_id)
             # fantasy_name = client.fantasy_name        
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             received_data_view = ReceivedDataView()
             modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             info_numbers = received_data_view.get_info_numbers(queryset, client_id, date_start, date_end, formatado=False)
-            log_content += f'[{current_time}] - info numbers: {info_numbers} \n'
             tipo_cartoes_final = received_data_view.get_tipo_cartoes(client_id, date_start, date_end)
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             adquirente_data = received_data_view.get_adquirente(client_id, date_start, date_end)
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             servicos_adicionais_pagos = received_data_view.get_servicos_adicionais_pagos_bruto(client_id, date_start, date_end)          
             quantidade_total_vendas = received_data_view.get_total_vendas(client_id, date_start, date_end)          
             venda_total = info_numbers["vendaTotal"]["value"]
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'                       
             # CRIANDO O EXCEL
             # Criar um novo Workbook
             wb = Workbook()
