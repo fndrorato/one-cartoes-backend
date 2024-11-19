@@ -1184,7 +1184,7 @@ class ExportDashboardView(generics.CreateAPIView):
             modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
             log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             info_numbers = received_data_view.get_info_numbers(queryset, client_id, date_start, date_end, formatado=False)
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
+            log_content += f'[{current_time}] - info numbers: {info_numbers} \n'
             tipo_cartoes_final = received_data_view.get_tipo_cartoes(client_id, date_start, date_end)
             log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             adquirente_data = received_data_view.get_adquirente(client_id, date_start, date_end)
