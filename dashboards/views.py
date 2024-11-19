@@ -1421,9 +1421,11 @@ class ExportDashboardView(generics.CreateAPIView):
             # Converter datas para o formato DDMMYYYY
             date_start_str = date_start.strftime('%d%m%Y')
             date_end_str = date_end.strftime('%d%m%Y')
-            
+            # Gerar um UUID único
+            unique_id = uuid.uuid4().hex[:8]  # Usa os primeiros 8 caracteres do UUID
+
             # Gerar o nome do arquivo final
-            filename = f"dadosDashboard_{date_start_str}_{date_end_str}.xlsx"            
+            filename = f"dadosDashboard_{date_start_str}_{date_end_str}_{unique_id}.xlsx"            
 
             file_path = os.path.join(settings.MEDIA_ROOT, 'exported_dashboards', filename)
 
