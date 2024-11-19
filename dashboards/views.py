@@ -1162,7 +1162,7 @@ class ExportDashboardView(generics.CreateAPIView):
             
             # Montar o log
             current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
+            log_content = f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             
             # Formatar as datas no padrão desejado
             date_start_formatted = date_start.strftime("%d/%m/%Y")
