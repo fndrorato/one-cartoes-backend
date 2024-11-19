@@ -1162,7 +1162,7 @@ class ExportDashboardView(generics.CreateAPIView):
             
             # Montar o log
             current_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-            log_content = f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             
             # Formatar as datas no padrão desejado
             date_start_formatted = date_start.strftime("%d/%m/%Y")
@@ -1179,16 +1179,20 @@ class ExportDashboardView(generics.CreateAPIView):
             # Obter informações adicionais
             # client = get_object_or_404(Clients, id=client_id)
             # fantasy_name = client.fantasy_name        
-
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             received_data_view = ReceivedDataView()
             modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             info_numbers = received_data_view.get_info_numbers(queryset, client_id, date_start, date_end, formatado=False)
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             tipo_cartoes_final = received_data_view.get_tipo_cartoes(client_id, date_start, date_end)
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             adquirente_data = received_data_view.get_adquirente(client_id, date_start, date_end)
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'
             servicos_adicionais_pagos = received_data_view.get_servicos_adicionais_pagos_bruto(client_id, date_start, date_end)          
             quantidade_total_vendas = received_data_view.get_total_vendas(client_id, date_start, date_end)          
             venda_total = info_numbers["vendaTotal"]["value"]
-                       
+            log_content += f'[{current_time}] - Iniciando a exportação do cliente: {client_id} \n'                       
             # CRIANDO O EXCEL
             # Criar um novo Workbook
             wb = Workbook()
@@ -1447,88 +1451,6 @@ class ExportDashboardView(generics.CreateAPIView):
             # Registrar o erro
             logger.error(f'Erro ao criar o link compartilhado: {str(e)}')
             return Response({'error': 'Ocorreu um erro ao criar o link compartilhado.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
-
-
-
-
-class ExportDashboardViewFirstVersion(APIView):
-    # Exigir que o usuário esteja autenticado
-    permission_classes = [IsAuthenticated]         
-    
-    def get(self, request):
-        # Obter parâmetros da URL
-        client_id = request.query_params.get('client_id')
-        date_start = request.query_params.get('date_start')
-        date_end = request.query_params.get('date_end')
-        
-        # Validar parâmetros obrigatórios
-        if not client_id or not date_start or not date_end:
-            return Response({"error": "Parâmetros 'client_id', 'date_start' e 'date_end' são obrigatórios."},
-                            status=status.HTTP_400_BAD_REQUEST)
-            
-        # Converte strings de data para objetos datetime
-        try:
-            date_start = datetime.strptime(date_start, "%Y-%m-%d").date()
-            date_end = datetime.strptime(date_end, "%Y-%m-%d").date()
-        except ValueError:
-            return Response({"error": "Formato de data inválido. Use AAAA-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Filtra os registros de acordo com client_id e intervalo de data
-        queryset = Received.objects.filter(
-            client_id=client_id,
-            data_pagamento__range=(date_start, date_end)
-        ).values('modality').annotate(
-            valor_bruto_sum=Sum('valor_bruto'),
-            valor_taxa_sum=Sum('valor_taxa')
-        )          
-        
-        # Obtenha o cliente pelo client_id e retorne o fantasy_name
-        client = get_object_or_404(Clients, id=client_id)
-        fantasy_name = client.fantasy_name        
-        
-        # Serializa o resultado e retorna a resposta JSON
-        received_data_view = ReceivedDataView()
-        # modality_data = received_data_view.get_modality_numbers(client_id, date_start, date_end)
-        # info_numbers = received_data_view.get_info_numbers(queryset, client_id, date_start, date_end)
-        # tipo_cartoes_final = received_data_view.get_tipo_cartoes(client_id, date_start, date_end)
-        # adquirente_data = received_data_view.get_adquirente(client_id, date_start, date_end)
-        # servicos_adicionais_pagos = received_data_view.get_servicos_adicionais_pagos(client_id, date_start, date_end)          
-
-        # Caminho para o modelo do Excel em dashboards/excel_model/
-        model_path = os.path.join(settings.BASE_DIR, 'dashboards', 'excel_model', 'dashboard_model.xlsx')
-        
-        # Carregar o modelo do Excel
-        # workbook = load_workbook(model_path)
-        workbook = openpyxl.load_workbook(model_path, read_only=False)
-
-        sheet = workbook['Info']  # Use o nome exato da aba
-        
-        # # Colocando os dados básicos
-        formatted_text = f'Período de Apuração {date_start.strftime("%d/%m/%Y")} - {date_end.strftime("%d/%m/%Y")}'
-        sheet['B1'] = f'{fantasy_name}'
-        sheet['B2'] = f'{formatted_text}'
-        
-        # Caminho para salvar o arquivo atualizado na pasta `media`
-        # output_filename = f"dashboard_{client_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        # output_path = os.path.join(settings.MEDIA_ROOT, 'exported_dashboards', output_filename)
-
-        # Criar a pasta se não existir
-        # os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        # Salvar o workbook atualizado
-        # workbook.save(output_path)
-        workbook.save(model_path)
-        
-        return Response({"error": "Formato de data inválido. Use AAAA-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Retornar o arquivo atualizado para download
-        # with open(output_path, 'rb') as file:
-        #     response = HttpResponse(
-        #         file.read(),
-        #         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        #     )
-        #     response['Content-Disposition'] = f'attachment; filename={output_filename}'
-        #     return response
 
 
 
