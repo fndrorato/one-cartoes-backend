@@ -3,6 +3,8 @@ from .models import Received
 from datetime import datetime
 
 class ReceivedSerializer(serializers.ModelSerializer):
+    id_received = serializers.IntegerField(source='id', read_only=True) 
+    
     id_modalidade = serializers.IntegerField(source='modality.id', read_only=True) 
     nome_modalidade = serializers.CharField(source='modality.name', read_only=True)
     id_produto = serializers.IntegerField(source='product.id', read_only=True)  
@@ -17,7 +19,7 @@ class ReceivedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Received
         fields = [
-            'id',
+            'id_received',
             'id_pagamento',
             'refo_id',
             'estabelecimento',

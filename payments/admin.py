@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product, TransactionType, Bank, Modality, PaymentStatus, Received, TypeCard, ServicosPagos
+from .models import Product, TransactionType, Bank, Modality, PaymentStatus, Received, TypeCard, ServicosPagos, ReceivedUpdateLog
 
 # Register your models here.
 admin.site.register(TransactionType)
@@ -23,3 +23,9 @@ class ProductAdmin(admin.ModelAdmin):
     def type_card(self, obj):
         return obj.type_card.name if obj.type_card else '-'
     type_card.short_description = 'Tipo de Cartão'
+    
+@admin.register(ReceivedUpdateLog)
+class ReceivedUpdateLogAdmin(admin.ModelAdmin):
+    list_display = ('received', 'updated_at', 'updated_by')
+    list_filter = ('updated_at', 'updated_by')
+    search_fields = ('received__id',)    

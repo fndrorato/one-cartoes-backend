@@ -2,9 +2,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import Received
-from .serializers import ReceivedSerializer
 from django.shortcuts import get_object_or_404
+from django.utils.timezone import now
+from decimal import Decimal
+from .models import Received, ReceivedUpdateLog
+from .serializers import ReceivedSerializer
+
+def serialize_decimal(value):
+    """Converte valores Decimal em float ou str para ser serializável em JSON."""
+    return float(value) if isinstance(value, Decimal) else value
 
 class ReceivedListView(APIView):
     # Exigir que o usuário esteja autenticado
@@ -26,69 +32,79 @@ class ReceivedListView(APIView):
             received_records = Received.objects.filter(
                 client_id=client_id,
                 data_pagamento__range=[date_start, date_end]
-            )[:10] 
+            ).select_related(
+                'modality', 'product', 'adquirente', 'transactiontype', 'id_status'
+            )[:10]
             
-
-            
-            
-            print(received_records.count())
-            
-            # received_data_list = [
-            #     {
-            #         'id': record.id,
-            #         'id_pagamento': record.id_pagamento,
-            #         'refo_id': record.refo_id,
-            #         'estabelecimento': record.estabelecimento,
-            #         'data_pagamento': record.data_pagamento,
-            #         'data_prevista_pagamento': record.data_prevista_pagamento,
-            #         'data_venda': record.data_venda,
-            #         'autorizacao': record.autorizacao,
-            #         'nsu': record.nsu,
-            #         'id_transacao': record.id_transacao,
-            #         'parcela': record.parcela,
-            #         'total_parcelas': record.total_parcelas,
-            #         'resumo_venda': record.resumo_venda,
-            #         'valor_bruto': record.valor_bruto,
-            #         'taxa': record.taxa,
-            #         'outras_despesas': record.outras_despesas,
-            #         'valor_liquido': record.valor_liquido,
-            #         'idt_antecipacao': record.idt_antecipacao,
-            #         'agencia': record.agencia,
-            #         'conta': record.conta,
-            #         'nome_loja': record.nome_loja,
-            #         'terminal': record.terminal,
-            #         'divergencias': record.divergencias,
-            #         'valor_liquido_venda': record.valor_liquido_venda,
-            #         'observacao': record.observacao,
-            #         'motivo_ajuste': record.motivo_ajuste,
-            #         'conta_adquirente': record.conta_adquirente,
-            #         'taxa_antecipacao': record.taxa_antecipacao,
-            #         'taxa_antecipacao_mensal': record.taxa_antecipacao_mensal,
-            #         'valor_taxa_antecipacao': record.valor_taxa_antecipacao,
-            #         'valor_taxa': record.valor_taxa,
-            #         'tem_conciliacao_bancaria': record.tem_conciliacao_bancaria,
-            #         'cartao': record.cartao,
-            #         'client': record.client.id if record.client else None,
-            #         'id_adquirente': record.adquirente.id if record.adquirente else None,
-            #         'nome_adquirente': record.adquirente.name if record.adquirente else None,
-            #         'id_produto': record.product.id if record.product else None,
-            #         'nome_produto': record.product.name if record.product else None,
-            #         'banco': record.banco,
-            #         'id_tipo_transacao': record.transactiontype.id if record.transactiontype else None,
-            #         'nome_tipo_transacao': record.transactiontype.name if record.transactiontype else None,
-            #         # 'id_status_pagamento': record.paymentstatus.id if record.paymentstatus else None,
-            #         # 'descricao_status_pagamento': record.paymentstatus.description if record.paymentstatus else None,
-            #         'id_modalidade': record.modality.id if record.modality else None,
-            #         'nome_modalidade': record.modality.name if record.modality else None
-            #     }
-            #     for record in received_records
-            # ]
-
-
+            if not received_records.exists():
+                return Response({"detail": "Nenhum registro encontrado."}, status=status.HTTP_404_NOT_FOUND)            
             # Serialização e retorno dos dados
             serializer = ReceivedSerializer(received_records, many=True)
-            # return Response(received_data_list, status=status.HTTP_200_OK)
+
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
+            print("error", str(e))
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UpdateReceivedView(APIView):
+    """
+    View para atualizar um registro do modelo Received e registrar as alterações.
+    """
+    
+    # Exigir que o usuário esteja autenticado
+    permission_classes = [IsAuthenticated]     
+
+    def put(self, request, pk):
+        
+        try:
+            # Busca a instância do modelo Received
+            received_instance = Received.objects.get(pk=pk)
+        except Received.DoesNotExist:
+            return Response(
+                {"error": "Registro não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Define os dados antes da atualização
+        before_update = {
+            "valor_bruto": serialize_decimal(received_instance.valor_bruto),
+            "observacao": received_instance.observacao,
+            "motivo_ajuste": received_instance.motivo_ajuste,
+        }
+        
+        # Valida e atualiza os dados com o serializer
+        serializer = ReceivedSerializer(
+            received_instance, data=request.data, partial=True
+        )
+        if serializer.is_valid():
+            serializer.save()
+            # Serializa os dados novos (após a atualização)
+            after_update = {
+                "valor_bruto": serialize_decimal(request.data.get("valor_bruto", received_instance.valor_bruto)),
+                "observacao": request.data.get("observacao", received_instance.observacao),
+                "motivo_ajuste": request.data.get("motivo_ajuste", received_instance.motivo_ajuste),
+            }
+
+            try:
+                # Cria o log da atualização
+                ReceivedUpdateLog.objects.create(
+                    received=received_instance,
+                    before_update=before_update,
+                    after_update=after_update,
+                    updated_by=request.user if request.user.is_authenticated else None,
+                    updated_at=now(),
+                )
+            except Exception as e:
+                # Captura e registra o erro
+                print("Erro ao salvar log de atualização: %s", str(e))
+            
+            response_data = {
+                "success": True,
+                "message": "Pagamento atualizado com sucesso.",
+                "status": status.HTTP_200_OK
+            }       
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

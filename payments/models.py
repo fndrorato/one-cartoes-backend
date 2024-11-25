@@ -122,3 +122,21 @@ class Received(models.Model):
         indexes = [
             models.Index(fields=['client', 'data_pagamento']),
         ]    
+class ReceivedUpdateLog(models.Model):
+    received = models.ForeignKey(
+        'Received', 
+        on_delete=models.CASCADE, 
+        related_name='update_logs'
+    )  # FK para o registro atualizado
+    before_update = models.JSONField()  # Dados antes da atualização
+    after_update = models.JSONField()  # Dados após a atualização
+    updated_at = models.DateTimeField(auto_now_add=True)  # Data e hora da atualização
+    updated_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )  # Usuário que realizou a atualização
+
+    def __str__(self):
+        return f'Update for {self.received.id} at {self.updated_at.strftime("%Y-%m-%d %H:%M:%S")}'
