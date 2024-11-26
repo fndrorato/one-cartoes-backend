@@ -34,7 +34,7 @@ class ReceivedListView(APIView):
                 data_pagamento__range=[date_start, date_end]
             ).select_related(
                 'modality', 'product', 'adquirente', 'transactiontype', 'id_status'
-            )[:10]
+            )
             
             if not received_records.exists():
                 return Response({"detail": "Nenhum registro encontrado."}, status=status.HTTP_404_NOT_FOUND)            
