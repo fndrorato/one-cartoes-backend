@@ -11,6 +11,7 @@
 
 O **Sistema de Dashboard para Conciliação de Cartões** é uma ferramenta robusta desenvolvida para auxiliar lojistas e clientes na análise e gestão de pagamentos realizados por operadoras de cartão de crédito (adquirentes). Com um design intuitivo e uma infraestrutura tecnológica sólida, o sistema oferece uma visão clara e precisa sobre as taxas cobradas, antecipações e resultados financeiros.
 
+![Dashboard](docs/dashboard.png)
 
 ## 🖥 Arquitetura Tecnológica
 - Frontend: Desenvolvido em React, proporcionando uma interface dinâmica e responsiva para os usuários.
