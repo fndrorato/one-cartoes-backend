@@ -74,7 +74,8 @@ class ServicosPagos(models.Model):
         return f'{self.observacao}'     
     
 class Received(models.Model):
-    id = models.BigAutoField(primary_key=True) # Identificador do pagamento
+    id = models.BigAutoField(primary_key=True)
+    id_received = models.BigIntegerField(null=True, blank=True, default=0)
     id_pagamento = models.CharField(max_length=100, blank=True, null=True) # Identificador do cliente na venda
     refo_id = models.IntegerField() # Identificador interno da empresa
     client = models.ForeignKey(Clients, on_delete=models.RESTRICT)  # Chave estrangeira para o modelo Clients
@@ -118,10 +119,11 @@ class Received(models.Model):
     def __str__(self):
         return f'{self.client.name} - {self.id} - {self.data_pagamento.strftime("%Y-%m-%d") if self.data_pagamento else "Data não disponível"}'
     
-    class Meta:
+    class Meta:     
         indexes = [
             models.Index(fields=['client', 'data_pagamento']),
         ]    
+        
 class ReceivedUpdateLog(models.Model):
     received = models.ForeignKey(
         'Received', 

@@ -2,12 +2,13 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import (
-    GroupListCreateView, GroupDetailView,
+    GroupListCreateView, GroupDetailView, GroupListAllView,
     ClientListCreateView, ClientDetailView
 )
 
 urlpatterns = [
     path('groups/', GroupListCreateView.as_view(), name='group-list-create'),
+    path('groups/all/', GroupListAllView.as_view(), name='group-list-label'),
     path('groups/<int:pk>/', GroupDetailView.as_view(), name='group-detail'),
     
     path('clients/', ClientListCreateView.as_view(), name='client-list-create'),

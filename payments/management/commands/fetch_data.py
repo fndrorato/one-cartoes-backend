@@ -152,14 +152,14 @@ class Command(BaseCommand):
         url = "https://api.conciliadora.com.br/api/ConsultaPagamento"
 
         # groups = Groups.objects.get(pk=5)
-        groups = Groups.objects.filter(pk__gte=1, pk__lte=3)
+        groups = Groups.objects.filter(pk__gte=3, pk__lte=3)
         # Iterar sobre os grupos filtrados
         for group in groups:        
             token = group.token
             imprimir = f'{group.id} - {token}'
             print(imprimir)
 
-            params = {"$filter": "DataPagamento ge 2024-11-01 and DataPagamento le 2024-11-30"}
+            params = {"$filter": "DataPagamento ge 2024-11-01 and DataPagamento le 2024-11-02"}
             headers = {"Content-Type": "application/json", "Authorization": f"{token}"}
 
             response = requests.get(url, headers=headers, params=params)
@@ -346,10 +346,6 @@ class Command(BaseCommand):
                 num_duplicatas_removidas = num_linhas_antes - num_linhas_depois
 
                 print(f"Número de duplicatas removidas: {num_duplicatas_removidas}")
-                
-                
-                
-                                  
 
                 for index, row in merged_df.iterrows():
                     try:
@@ -449,24 +445,69 @@ class Command(BaseCommand):
 
                 # Realizando o bulk_create em uma transação para garantir atomicidade
                 try:
+                    print(f"Total de itens em 'recebidos': {len(recebidos)}")  # Quantidade total de itens em 'recebidos'
                     # Obter os IDs únicos dos clientes que estão sendo processados
                     clientes_processados_ids = {item.client.id for item in recebidos if item.client}  # Garantir que o cliente existe
 
                     # Defina as datas inicial e final
-                    dt_ini = date(2024, 11, 1)  # Exemplo: 1º de outubro de 2024
-                    dt_fim = date(2024, 11, 30)  # Exemplo: 31 de outubro de 2024
-
+                    dt_ini = date(2024, 11, 1)  
+                    dt_fim = date(2024, 11, 2)  
+                    
                     # Filtrar registros com data_pagamento dentro do intervalo
                     registros_existentes = Received.objects.filter(
                         client_id__in=clientes_processados_ids,
                         data_pagamento__range=(dt_ini, dt_fim)
-                    ).values_list('id', flat=True)
+                    ).values_list('id_received', flat=True)
 
                     # Filtrar o `recebidos` para remover os itens que já estão no queryset
                     recebidos_filtrados = [item for item in recebidos if item.id not in registros_existentes]
+                    # Filtrar 'recebidos' garantindo que (item.id, item.client.id) não esteja em registros_existentes
+                    # recebidos_filtrados = [
+                    #     item for item in recebidos if (item.id_received, item.client.id) not in registros_existentes
+                    # ]                    
                     
+                    # Prints para análise
+                    print(f"Total de itens em 'recebidos': {len(recebidos)}")  # Quantidade total de itens em 'recebidos'
+                    print(f"Total de itens em 'recebidos_filtrados': {len(recebidos_filtrados)}")  # Quantidade filtrada
+                    print(f"Total removidos: {len(recebidos) - len(recebidos_filtrados)}")  # Total de itens removidos                    
+                    
+                    # ID alvo que queremos verificar
+                    id_alvo = 6557575876
+                    # Filtrar o registro com o ID especificado
+                    registro_alvo = Received.objects.filter(id_received=id_alvo).values()
+
+                    # Imprimir o resultado como um dicionário (ou lista de dicionários se houver mais de um resultado)
+                    if registro_alvo.exists():
+                        print(f"Registro encontrado: {registro_alvo[0]}")  # Exibe o primeiro registro
+                    else:
+                        print(f"Nenhum registro encontrado com o ID {id_alvo}")                    
+
+                    # Verificar se o ID está presente em 'recebidos'
+                    for item in recebidos:
+                        if item.id == id_alvo:
+                            print(f"Encontrado em 'recebidos': {item}")
+                            break  # Interrompe o loop ao encontrar o item (opcional)
+                        
+                    registros_existentes_set = set(registros_existentes)
+                    if id_alvo in registros_existentes_set:
+                        print(f"O ID {id_alvo} está presente em 'registros_existentes'")
+                    else:
+                        print(f"O ID {id_alvo} NÃO está presente em 'registros_existentes'")
+                        
+                    id_alvo_2 = 6548881276
+                    if id_alvo_2 in registros_existentes_set:
+                        print(f"O id_alvo_2 {id_alvo_2} está presente em 'registros_existentes'")
+                    else:
+                        print(f"O id_alvo_2 {id_alvo_2} NÃO está presente em 'registros_existentes'")                    
+                    # Verificar se o ID está presente em 'recebidos_filtrados'
+                    for item in recebidos_filtrados:
+                        if item.id == id_alvo:
+                            print(f"Encontrado em 'recebidos_filtrados': {item}")
+                            break  # Interrompe o loop ao encontrar o item (opcional)
+                        
+                                                
                     with transaction.atomic():
-                        Received.objects.bulk_create(recebidos_filtrados, batch_size=400)  # Ajuste o batch_size conforme necessário
+                        Received.objects.bulk_create(recebidos_filtrados, batch_size=4000)  # Ajuste o batch_size conforme necessário
                     self.stdout.write(self.style.SUCCESS("Dados coletados e armazenados com sucesso!"))
                 except Exception as e:
                     print(f"Erro ao realizar bulk_create: {str(e)}")
