@@ -531,25 +531,6 @@ class SharedLinkCreateView(generics.CreateAPIView):
             logger.error(f'Erro ao criar o link compartilhado: {str(e)}')
             return Response({'error': 'Ocorreu um erro ao criar o link compartilhado.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
 
-# class SharedLinkCreateView(generics.CreateAPIView):
-#     queryset = SharedLink.objects.all()
-#     serializer_class = SharedLinkSerializer
-#     permission_classes = [IsAuthenticated]
-
-#     def perform_create(self, serializer):
-#         # Gera um código único para o code_url
-#         unique_code = str(uuid.uuid4())  # Gera um UUID como código único
-#         serializer.save(created_by=self.request.user, code_url=unique_code)
-
-#     def create(self, request, *args, **kwargs):
-#         # Chama o método de criação padrão
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         self.perform_create(serializer)
-
-#         # Retorna a resposta com o code_url
-#         return Response({'code_url': serializer.instance.code_url}, status=status.HTTP_201_CREATED)
-
 class ReceivedDataView(APIView):
     
     # Exigir que o usuário esteja autenticado
@@ -1015,7 +996,20 @@ class ReceivedDataView(APIView):
                 "id": tipo_cartao_id,
                 "title": tipo_cartao_title,
                 "value": round(porcentagem, 2) 
-            })       
+            }) 
+            
+        # Atualizar os valores de 'Venda Bruta'
+        for tipo, valores in tipo_cartoes_final[0].items():
+            for item in valores:
+                item['Venda Bruta'] = item['Venda Bruta'] / Decimal(1000)
+                
+        # Dividindo os valores de "Venda Bruta" por 1000
+        for item in adquirente_data:
+            item['Venda Bruta'] = item['Venda Bruta'] / Decimal('1000')                      
+            
+        # Dividindo os valores por 1000
+        for item in servicos_adicionais_pagos:
+            item['Valor'] = item['Valor'] / Decimal('1000')            
 
         analytics_data = {
             "TaxaEfetiva": modality_data.data,
@@ -1024,7 +1018,7 @@ class ReceivedDataView(APIView):
             "adquirente": adquirente_data,
             "servicosAdicionaisPagos": servicos_adicionais_pagos,
             "vendaPorTipoCartao": venda_por_tipo_cartao
-        }        
+        }   
         
         return Response(analytics_data, status=status.HTTP_200_OK)
 
@@ -1448,7 +1442,196 @@ class ExportDashboardView(generics.CreateAPIView):
             logger.error(f'Erro ao criar o link compartilhado: {str(e)}')
             return Response({'error': 'Ocorreu um erro ao criar o link compartilhado.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
 
+class ComparativeDataView(APIView):
+    # Exigir que o usuário esteja autenticado
+    permission_classes = [IsAuthenticated]  
+    
+    def get(self, request):
+        
+        client_id = request.query_params.get('client_id')
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+        
+        # Verifica se todos os parâmetros obrigatórios foram fornecidos
+        if not (client_id and date_start and date_end):
+            return Response({"error": "Parâmetros insuficientes."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Processa o client_id como um vetor
+        try:
+            client_ids = [int(cid) for cid in client_id.split(',')]  # Converte cada valor para inteiro
+        except ValueError:
+            return Response({"error": "client_id deve ser uma lista de inteiros, por exemplo: 1 ou 1,3."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Converte strings de data para objetos datetime
+        try:
+            date_start = datetime.strptime(date_start, "%Y-%m-%d").date()
+            date_end = datetime.strptime(date_end, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Formato de data inválido. Use AAAA-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        all_modality_data = []  # Lista para armazenar os dados de todas as lojas
+        all_categories = set()  # Usaremos um set para encontrar categorias únicas
+        
+        cartoes_credito_data = []
+        all_credito_flags = set()
+        
+        cartoes_debito_data = []
+        all_debito_flags = set()
+        
+        cartoes_beneficio_data = []
+        all_beneficio_flags = set()
+        
+        all_adquirente_data = []
+        all_adquirentes_brands = set()
+        
+        received_data_view = ReceivedDataView()
+
+        for cid in client_ids:
+            modality_data = received_data_view.get_modality_numbers([cid], date_start, date_end)  # Obtém os dados da loja
+            tipo_cartoes_final = received_data_view.get_tipo_cartoes([cid], date_start, date_end)
+            adquirente_data = received_data_view.get_adquirente([cid], date_start, date_end)                     
+
+            client = get_object_or_404(Clients, id=cid)
+            store_name = client.fantasy_name  
+            
+            all_modality_data.append({"store_name": store_name, "data": modality_data.data})
+            cartoes_credito_data.append({"store_name": store_name, "data": tipo_cartoes_final[0]['Credito']})
+            cartoes_debito_data.append({"store_name": store_name, "data": tipo_cartoes_final[0]['Debito']})
+            cartoes_beneficio_data.append({"store_name": store_name, "data": tipo_cartoes_final[0]['Voucher']})
+            all_adquirente_data.append({"store_name": store_name, "data": adquirente_data})
+            
+            # Adiciona as categorias encontradas nos dados dessa loja
+            all_categories.update([item['title'] for item in modality_data.data])
+            all_credito_flags.update([item['name'] for item in tipo_cartoes_final[0]['Credito']])
+            all_debito_flags.update([item['name'] for item in tipo_cartoes_final[0]['Debito']])
+            all_beneficio_flags.update([item['name'] for item in tipo_cartoes_final[0]['Voucher']])
+            all_adquirentes_brands.update([item['name'] for item in adquirente_data])
+
+        # Converte o set de categorias para uma lista ordenada
+        categories = sorted(all_categories)
+
+        # Monta a estrutura final de séries
+        series = []
+        for store_data in all_modality_data:
+            data_values = [
+                next((item['value'] for item in store_data["data"] if item['title'] == category), 0)
+                for category in categories
+            ]
+
+            series.append({
+                "name": store_data["store_name"],
+                "data": data_values
+            })
+
+        # Estrutura de resposta
+        taxa_efetiva = {
+            "categories": categories,
+            "series": series
+        }
+        
+        # CREDITO
+        # Converte o set de categorias para uma lista ordenada
+        categories = sorted(all_credito_flags)
+
+        # Monta a estrutura final de séries
+        series = []
+        for store_data in cartoes_credito_data:
+            data_values = [
+                next((item['Taxa%'] for item in store_data["data"] if item['name'] == category), 0)
+                for category in categories
+            ]
+
+            series.append({
+                "name": store_data["store_name"],
+                "data": data_values
+            })
+
+        # Estrutura de resposta
+        taxa_cartao_credito = {
+            "categories": categories,
+            "series": series
+        }  
+        
+        # DEBITO
+        # Converte o set de categorias para uma lista ordenada
+        categories = sorted(all_debito_flags)
+
+        # Monta a estrutura final de séries
+        series = []
+        for store_data in cartoes_debito_data:
+            data_values = [
+                next((item['Taxa%'] for item in store_data["data"] if item['name'] == category), 0)
+                for category in categories
+            ]
+
+            series.append({
+                "name": store_data["store_name"],
+                "data": data_values
+            })
+
+        # Estrutura de resposta
+        taxa_cartao_debito = {
+            "categories": categories,
+            "series": series
+        }    
+        
+        # BENEFICIO
+        # Converte o set de categorias para uma lista ordenada
+        categories = sorted(all_beneficio_flags)
+
+        # Monta a estrutura final de séries
+        series = []
+        for store_data in cartoes_beneficio_data:
+            data_values = [
+                next((item['Taxa%'] for item in store_data["data"] if item['name'] == category), 0)
+                for category in categories
+            ]
+
+            series.append({
+                "name": store_data["store_name"],
+                "data": data_values
+            })
+
+        # Estrutura de resposta
+        taxa_cartao_beneficio = {
+            "categories": categories,
+            "series": series
+        } 
+        
+        # ADQUIRENTES
+        # Converte o set de categorias para uma lista ordenada
+        categories = sorted(all_adquirentes_brands)
+
+        # Monta a estrutura final de séries
+        series = []
+        for store_data in all_adquirente_data:
+            data_values = [
+                next((item['Taxa%'] for item in store_data["data"] if item['name'] == category), 0)
+                for category in categories
+            ]
+
+            series.append({
+                "name": store_data["store_name"],
+                "data": data_values
+            })
+
+        # Estrutura de resposta
+        taxa_adquirentes = {
+            "categories": categories,
+            "series": series
+        }                               
+        
+        comparative_data = {
+            "taxa_efetiva": taxa_efetiva,
+            "taxa_cartao_credito": taxa_cartao_credito,
+            "taxa_cartao_debito": taxa_cartao_debito,
+            "taxa_cartao_beneficio": taxa_cartao_beneficio,
+            "taxa_adquirentes": taxa_adquirentes,
+        }  
+
+        
+        return Response(comparative_data, status=status.HTTP_200_OK)             
+    
 
 def dashboard_view(request):
     analytics_data = {
