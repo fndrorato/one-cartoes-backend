@@ -15,7 +15,7 @@ from rest_framework import status
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum, OuterRef, Subquery, FloatField
+from django.db.models import Sum, OuterRef, Subquery, FloatField, Q
 from django.http import HttpResponse
 from decimal import Decimal
 from openpyxl import load_workbook
@@ -610,6 +610,8 @@ class ReceivedDataView(APIView):
             client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0  # Adiciona a condição para valor_liquido >= 0
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         ).count()  # Conta o número de linhas que atendem ao filtro
 
         return total_vendas  # Retorna o total de vendas
@@ -620,6 +622,8 @@ class ReceivedDataView(APIView):
             client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         ).values('modality').annotate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -691,6 +695,8 @@ class ReceivedDataView(APIView):
             client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0           
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         ).aggregate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -704,6 +710,8 @@ class ReceivedDataView(APIView):
             data_pagamento__range=(date_start, date_end),            
             idt_antecipacao=True,
             valor_bruto__gte=0   
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         ).aggregate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -716,6 +724,8 @@ class ReceivedDataView(APIView):
             client_id__in=client_id,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         ).aggregate(
             valor_bruto_sum=Sum('valor_bruto'),
             valor_taxa_sum=Sum('valor_taxa')
@@ -732,6 +742,8 @@ class ReceivedDataView(APIView):
                 client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0
+            ).exclude(
+                Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
             ).values(
                 'product__type_card__name',  # Nome do tipo de cartão
                 'product__name'              # Nome do produto
@@ -794,6 +806,8 @@ class ReceivedDataView(APIView):
                 client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0
+            ).exclude(
+                Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
             ).values(
                 'adquirente__name'  # Nome do adquirente
             )
@@ -832,6 +846,8 @@ class ReceivedDataView(APIView):
                 client_id__in=client_id,
                 data_pagamento__range=(date_start, date_end),
                 valor_liquido__lt=0  # Filtra para incluir apenas valores líquidos menores que 0
+            ).exclude(
+                Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
             )
             .annotate(
                 servicos_pagos_name=Subquery(
@@ -879,6 +895,9 @@ class ReceivedDataView(APIView):
                 data_pagamento__range=(date_start, date_end),
                 valor_liquido__lt=0  # Filtra para incluir apenas valores líquidos menores que 0
             )
+            .exclude(
+                Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
+            )            
             .values('observacao')  # Agrupa pelo nome de ServicosPagos
             .annotate(
                 total_liquido=Sum('valor_liquido')  # Soma dos valores líquidos
@@ -948,6 +967,8 @@ class ReceivedDataView(APIView):
             client_id__in=client_ids,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         )    
 
         # # Serializa o resultado e retorna a resposta JSON
@@ -962,6 +983,8 @@ class ReceivedDataView(APIView):
             client_id__in=client_ids,
             data_pagamento__range=(date_start, date_end),
             valor_bruto__gte=0
+        ).exclude(
+            Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
         ).aggregate(total=Sum('valor_bruto'))['total'] or 0
 
         # Em seguida, calcula a venda bruta por tipo de cartão
@@ -971,6 +994,8 @@ class ReceivedDataView(APIView):
                 data_pagamento__range=(date_start, date_end),
                 valor_bruto__gte=0,
                 product__type_card__id__isnull=False  # Filtra para garantir que o ID do tipo de cartão não seja nulo
+            ).exclude(
+                Q(observacao__icontains='gravame') | Q(motivo_ajuste__icontains='gravame')
             )
             .values('product__type_card__id', 'product__type_card__name')  # Agrupa pelo ID e título do type_card
             .annotate(
