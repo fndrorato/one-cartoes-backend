@@ -941,7 +941,7 @@ class ReceivedDataView(APIView):
         return servicos_adicionais_pagos    
                 
     def get(self, request):
-        client_id = request.query_params.get('client_id')
+        client_id = request.query_params.get('client_id')       
         date_start = request.query_params.get('date_start')
         date_end = request.query_params.get('date_end')
         
@@ -954,7 +954,7 @@ class ReceivedDataView(APIView):
             client_ids = [int(cid) for cid in client_id.split(',')]  # Converte cada valor para inteiro
         except ValueError:
             return Response({"error": "client_id deve ser uma lista de inteiros, por exemplo: 1 ou 1,3."}, status=status.HTTP_400_BAD_REQUEST)
-
+        
         # Converte strings de data para objetos datetime
         try:
             date_start = datetime.strptime(date_start, "%Y-%m-%d").date()
