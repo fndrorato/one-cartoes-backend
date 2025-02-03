@@ -315,13 +315,14 @@ class UserChangeClientUpdateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class ForgotPasswordView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         logger.info("ForgotPasswordView foi instanciada!")
 
-
+    @csrf_exempt  # Ignora CSRF para esta view
     def post(self, request):
         logger.info(f"Headers: {dict(request.headers)}")  
         logger.info(f"Body: {request.body.decode('utf-8')}")
