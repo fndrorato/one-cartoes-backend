@@ -230,6 +230,21 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        'django.request': {  # Captura requisições HTTP
+            'handlers': ['debug_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.server': {  # Captura logs do servidor Django
+            'handlers': ['debug_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'forgot_password': {  # Logger específico para sua view
+            'handlers': ['debug_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },        
     },
 }
 
