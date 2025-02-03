@@ -197,8 +197,6 @@ EMAIL_HOST_USER = 'contato@f5sys.com.br'
 EMAIL_HOST_PASSWORD = 'ic3h@wkk'
 DEFAULT_FROM_EMAIL = 'contato@f5sys.com.br'
 
-import os
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -219,6 +217,12 @@ LOGGING = {
             'filename': os.path.join(BASE_DIR, 'logs/error.log'),  # caminho do arquivo de log
             'formatter': 'verbose',  # Usando o formatter verbose
         },
+        'debug_file': {  # Novo handler para logs INFO e DEBUG
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs/debug.log'),
+            'formatter': 'verbose',
+        },        
     },
     'loggers': {
         'django': {

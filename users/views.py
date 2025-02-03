@@ -316,15 +316,22 @@ class UserChangeClientUpdateView(APIView):
     
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        logger.info("ForgotPasswordView foi instanciada!")
+
+
     def post(self, request):
-        logger.debug(f'Usuário solicitando recuperação de senha')
+        logger.info(f"Headers: {dict(request.headers)}")  
+        logger.info(f"Body: {request.body.decode('utf-8')}")
         serializer = ForgotPasswordSerializer(data=request.data)
-        logger.debug(f'Usuário spassou pelo ForgotSerializer')
         if serializer.is_valid():
             serializer.save()  # Cria o código e envia o e-mail
             return Response({'message': 'Verification code sent to email'}, status=status.HTTP_200_OK)
-        else:
-            logger.debug(f'Serializer nao foi valido')
+        
+        logger.warning("Serializer não foi válido!")
+        logger.warning(f"Erros: {serializer.errors}")
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
