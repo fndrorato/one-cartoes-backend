@@ -337,7 +337,10 @@ class ForgotPasswordView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
 class ResetPasswordView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
+    
+    @csrf_exempt  # Ignora CSRF para esta view
     def post(self, request):
         verify_number = request.data.get('verify_number')
         new_password = request.data.get('new_password')
