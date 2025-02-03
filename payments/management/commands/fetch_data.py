@@ -152,14 +152,14 @@ class Command(BaseCommand):
         url = "https://api.conciliadora.com.br/api/ConsultaPagamento"
 
         # groups = Groups.objects.get(pk=5)
-        groups = Groups.objects.filter(pk__gte=3, pk__lte=3)
+        groups = Groups.objects.filter(pk__gte=51, pk__lte=60)
         # Iterar sobre os grupos filtrados
         for group in groups:        
             token = group.token
             imprimir = f'{group.id} - {token}'
             print(imprimir)
 
-            params = {"$filter": "DataPagamento ge 2024-11-01 and DataPagamento le 2024-11-02"}
+            params = {"$filter": "DataPagamento ge 2025-01-01 and DataPagamento le 2025-01-31"}
             headers = {"Content-Type": "application/json", "Authorization": f"{token}"}
 
             response = requests.get(url, headers=headers, params=params)
@@ -450,8 +450,8 @@ class Command(BaseCommand):
                     clientes_processados_ids = {item.client.id for item in recebidos if item.client}  # Garantir que o cliente existe
 
                     # Defina as datas inicial e final
-                    dt_ini = date(2024, 11, 1)  
-                    dt_fim = date(2024, 11, 2)  
+                    dt_ini = date(2025, 1, 1)  
+                    dt_fim = date(2025, 1, 31)  
                     
                     # Filtrar registros com data_pagamento dentro do intervalo
                     registros_existentes = Received.objects.filter(
